@@ -17,3 +17,8 @@ export interface ModerationResponse {
   action: ModerationAction;
   labels: ModerationLabel[];
 }
+
+export interface UploadUrlResponse {
+  uploadUrl: string;
+  imageKey: string;
+}

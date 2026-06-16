@@ -35,7 +35,8 @@ jobs:
         run: pnpm run build
 
       - name: Package Lambda
-        run: zip -r function.zip dist
+        run: |
+          zip -r function.zip dist
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -50,7 +51,18 @@ jobs:
             --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
             --zip-file fileb://function.zip
 
-      - name: Wait for Lambda Update
+      - name: Wait for Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"
+
+      - name: Configure Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --handler dist/main.handler
+
+      - name: Wait for Lambda Configuration
         run: |
           aws lambda wait function-updated \
             --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"

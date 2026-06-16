@@ -31,11 +31,11 @@ export async function handler(event: APIGatewayProxyEvent) {
     const path = event.path;
 
     if (method === "POST" && path === "/moderate") {
-      return protectedRoute(event, () => moderateRoute(event));
+      return await protectedRoute(event, () => moderateRoute(event));
     }
 
     if (method === "POST" && path === "/upload-url") {
-      return protectedRoute(event, () => uploadUrlRoute());
+      return await protectedRoute(event, () => uploadUrlRoute());
     }
 
     if (method === "GET" && path === "/health") {

@@ -1,3 +1,13 @@
+export class HttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
 export function jsonResponse(statusCode: number, body: unknown) {
   return {
     statusCode,
@@ -23,4 +33,14 @@ export function internalServerError() {
   return jsonResponse(500, {
     error: "Internal server error",
   });
+}
+
+export function errorResponse(error: HttpError) {
+  return jsonResponse(error.statusCode, {
+    error: error.message,
+  });
+}
+
+export function isHttpError(error: unknown): error is HttpError {
+  return error instanceof HttpError;
 }

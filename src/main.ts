@@ -1,9 +1,29 @@
-import type { APIGatewayProxyEvent } from "aws-lambda";
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
+import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
 import { healthRoute } from "./routes/health.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
-import { internalServerError, jsonResponse } from "./utils/http-response.js";
+import {
+  errorResponse,
+  internalServerError,
+  isHttpError,
+  jsonResponse,
+} from "./utils/http-response.js";
+
+async function protectedRoute(
+  event: APIGatewayProxyEvent,
+  route: () => Promise<APIGatewayProxyResult>
+) {
+  const authContext = await authenticateApiKey(event);
+  const response = await route();
+
+  if (response.statusCode < 400) {
+    await recordUsage(authContext);
+  }
+
+  return response;
+}
 
 export async function handler(event: APIGatewayProxyEvent) {
   try {
@@ -11,11 +31,11 @@ export async function handler(event: APIGatewayProxyEvent) {
     const path = event.path;
 
     if (method === "POST" && path === "/moderate") {
-      return moderateRoute(event);
+      return protectedRoute(event, () => moderateRoute(event));
     }
 
     if (method === "POST" && path === "/upload-url") {
-      return uploadUrlRoute();
+      return protectedRoute(event, () => uploadUrlRoute());
     }
 
     if (method === "GET" && path === "/health") {
@@ -26,6 +46,10 @@ export async function handler(event: APIGatewayProxyEvent) {
       error: "Route not found",
     });
   } catch (error) {
+    if (isHttpError(error)) {
+      return errorResponse(error);
+    }
+
     console.error(error);
     return internalServerError();
   }

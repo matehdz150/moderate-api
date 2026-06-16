@@ -7,6 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:mapper": "tsx scripts/test-mapper.ts",
+    "create:test-api-key": "tsx scripts/create-test-api-key.ts",
     "build": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/main.js",
     "typecheck": "tsc --noEmit"
   },
@@ -15,8 +16,10 @@
   "license": "ISC",
   "packageManager": "pnpm@10.19.0",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1069.0",
     "@aws-sdk/client-rekognition": "^3.1069.0",
     "@aws-sdk/client-s3": "^3.1069.0",
+    "@aws-sdk/lib-dynamodb": "^3.1069.0",
     "@aws-sdk/s3-request-presigner": "^3.1069.0",
     "ulid": "^3.0.2"
   },

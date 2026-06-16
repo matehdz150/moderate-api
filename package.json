@@ -1,0 +1,28 @@
+{
+  "name": "ModerateAPI",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:mapper": "tsx scripts/test-mapper.ts",
+    "build": "esbuild src/handlers/moderate.handler.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/handlers/moderate.handler.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.19.0",
+  "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.1069.0",
+    "ulid": "^3.0.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.162",
+    "@types/node": "^25.9.3",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

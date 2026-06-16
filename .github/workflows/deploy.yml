@@ -44,22 +44,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Debug AWS Identity
-        run: |
-          aws sts get-caller-identity
-          echo "Region:"
-          aws configure get region
-
-      - name: Debug Lambda Secret
-        run: |
-          echo ">${{ secrets.LAMBDA_FUNCTION_NAME }}<"
-
-      - name: List Lambda Functions
-        run: |
-          aws lambda list-functions \
-            --query 'Functions[*].FunctionName' \
-            --output table
-
       - name: Deploy Lambda
         run: |
           aws lambda update-function-code \

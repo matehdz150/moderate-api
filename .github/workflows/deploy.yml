@@ -47,8 +47,6 @@ jobs:
       - name: Debug AWS Identity
         run: |
           aws sts get-caller-identity
-          echo "Region:"
-          aws configure get region
 
       - name: Debug Lambda Secret
         run: |
@@ -60,13 +58,13 @@ jobs:
             --query 'Functions[*].FunctionName' \
             --output table
 
-      - name: Deploy Lambda
-        run: |
-          aws lambda update-function-code \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
-            --zip-file fileb://function.zip
-
-      - name: Wait for Lambda Update
-        run: |
-          aws lambda wait function-updated \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"
+#      - name: Deploy Lambda
+#        run: |
+#          aws lambda update-function-code \
+#            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+#            --zip-file fileb://function.zip
+#
+#      - name: Wait for Lambda Update
+#        run: |
+#          aws lambda wait function-updated \
+#            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"

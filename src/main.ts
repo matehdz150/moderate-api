@@ -51,7 +51,9 @@ export async function handler(event: APIGatewayProxyEvent) {
     }
 
     if (method === "POST" && path === "/upload-url") {
-      return await protectedRoute(event, () => uploadUrlRoute());
+      return await protectedRoute(event, (authContext) =>
+        uploadUrlRoute(authContext)
+      );
     }
 
     if (method === "GET" && path === "/moderation-logs") {

@@ -6,6 +6,7 @@ import { detectModerationLabels } from "../services/rekognition.service.js";
 import type { AuthContext } from "../types/auth.types.js";
 import type { ModerateImageRequest } from "../types/moderation.types.js";
 import { badRequest, HttpError, ok } from "../utils/http-response.js";
+import { assertImageKeyBelongsToProject } from "../utils/s3-key-scope.js";
 
 const BUCKET_NAME = process.env.IMAGES_BUCKET_NAME;
 
@@ -68,6 +69,7 @@ export async function moderateRoute(
   }
 
   const body = parseModerateImageRequest(event.body);
+  assertImageKeyBelongsToProject(body.imageKey, authContext);
 
   try {
     const labels = await detectModerationLabels(BUCKET_NAME, body.imageKey);

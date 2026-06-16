@@ -3,6 +3,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
 import { healthRoute } from "./routes/health.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
+import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
 import type { AuthContext } from "./types/auth.types.js";
 import {
@@ -39,6 +40,12 @@ export async function handler(event: APIGatewayProxyEvent) {
 
     if (method === "POST" && path === "/upload-url") {
       return await protectedRoute(event, () => uploadUrlRoute());
+    }
+
+    if (method === "GET" && path === "/moderation-logs") {
+      return await protectedRoute(event, (authContext) =>
+        moderationLogsRoute(authContext)
+      );
     }
 
     if (method === "GET" && path === "/health") {

@@ -1,5 +1,9 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  PutCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 import type { ModerationLogRecord } from "../types/moderation.types.js";
 
@@ -24,4 +28,24 @@ export async function saveModerationLog(
       Item: logRecord,
     })
   );
+}
+
+export async function listModerationLogsByProject(
+  projectId: string,
+  limit = 20
+): Promise<ModerationLogRecord[]> {
+  const result = await dynamoDbClient.send(
+    new QueryCommand({
+      TableName: getModerationLogsTableName(),
+      IndexName: "projectId-createdAt-index",
+      KeyConditionExpression: "projectId = :projectId",
+      ExpressionAttributeValues: {
+        ":projectId": projectId,
+      },
+      ScanIndexForward: false,
+      Limit: limit,
+    })
+  );
+
+  return (result.Items as ModerationLogRecord[] | undefined) ?? [];
 }

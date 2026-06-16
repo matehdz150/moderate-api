@@ -58,9 +58,8 @@ export async function authenticateApiKey(
     throw new HttpError(429, "Monthly usage limit exceeded");
   }
 
-  await updateLastUsedAt(apiKeyRecord.apiKeyHash);
-
   return {
+    apiKeyHash: apiKeyRecord.apiKeyHash,
     accountId: apiKeyRecord.accountId,
     projectId: apiKeyRecord.projectId,
     planId: apiKeyRecord.planId,
@@ -70,9 +69,12 @@ export async function authenticateApiKey(
 }
 
 export async function recordUsage(authContext: AuthContext): Promise<void> {
-  await incrementUsage({
-    accountId: authContext.accountId,
-    projectId: authContext.projectId,
-    planId: authContext.planId,
-  });
+  await Promise.all([
+    incrementUsage({
+      accountId: authContext.accountId,
+      projectId: authContext.projectId,
+      planId: authContext.planId,
+    }),
+    updateLastUsedAt(authContext.apiKeyHash),
+  ]);
 }

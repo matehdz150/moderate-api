@@ -45,6 +45,11 @@ export async function getCurrentMonthUsage(
       Key: {
         usageKey,
       },
+      ProjectionExpression:
+        "usageKey, accountId, projectId, planId, #month, requestsUsed, updatedAt",
+      ExpressionAttributeNames: {
+        "#month": "month",
+      },
     })
   );
 

@@ -28,6 +28,11 @@ export async function getApiKeyByHash(
       Key: {
         apiKeyHash,
       },
+      ProjectionExpression:
+        "apiKeyHash, accountId, projectId, planId, #status, monthlyLimit, createdAt, lastUsedAt",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
     })
   );
 

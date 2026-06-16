@@ -22,6 +22,7 @@ export interface UsageRecord {
 }
 
 export interface AuthContext {
+  apiKeyHash: string;
   accountId: string;
   projectId: string;
   planId: string;

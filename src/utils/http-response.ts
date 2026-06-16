@@ -29,6 +29,12 @@ export function badRequest(message: string) {
   });
 }
 
+export function notFound(message: string) {
+  return jsonResponse(404, {
+    error: message,
+  });
+}
+
 export function internalServerError() {
   return jsonResponse(500, {
     error: "Internal server error",

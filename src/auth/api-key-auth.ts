@@ -2,7 +2,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { getApiKeyByHash, updateLastUsedAt } from "./api-key.repository.js";
 import { getCurrentMonthUsage, incrementUsage } from "./usage.repository.js";
-import type { AuthContext } from "../types/auth.types.js";
+import type { ApiKeyRecord, AuthContext } from "../types/auth.types.js";
 import { hashApiKey } from "../utils/crypto.js";
 import { HttpError } from "../utils/http-response.js";
 
@@ -18,10 +18,21 @@ function getHeader(event: APIGatewayProxyEvent, headerName: string) {
   return undefined;
 }
 
+function validateApiKeyRecord(apiKeyRecord: ApiKeyRecord) {
+  if (
+    !apiKeyRecord.accountId ||
+    !apiKeyRecord.projectId ||
+    !apiKeyRecord.planId ||
+    typeof apiKeyRecord.monthlyLimit !== "number"
+  ) {
+    throw new Error("API key record is misconfigured");
+  }
+}
+
 export async function authenticateApiKey(
   event: APIGatewayProxyEvent
 ): Promise<AuthContext> {
-  const apiKey = getHeader(event, "x-api-key");
+  const apiKey = getHeader(event, "x-api-key")?.trim();
 
   if (!apiKey) {
     throw new HttpError(401, "Missing API key");
@@ -33,6 +44,8 @@ export async function authenticateApiKey(
   if (!apiKeyRecord) {
     throw new HttpError(401, "Invalid API key");
   }
+
+  validateApiKeyRecord(apiKeyRecord);
 
   if (apiKeyRecord.status !== "active") {
     throw new HttpError(403, "API key is not active");

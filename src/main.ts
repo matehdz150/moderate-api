@@ -8,7 +8,7 @@ import {
   errorResponse,
   internalServerError,
   isHttpError,
-  jsonResponse,
+  notFound,
 } from "./utils/http-response.js";
 
 async function protectedRoute(
@@ -42,9 +42,7 @@ export async function handler(event: APIGatewayProxyEvent) {
       return healthRoute();
     }
 
-    return jsonResponse(404, {
-      error: "Route not found",
-    });
+    return notFound("Route not found");
   } catch (error) {
     if (isHttpError(error)) {
       return errorResponse(error);

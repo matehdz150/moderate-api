@@ -1,11 +1,14 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
 import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
+import { authenticateCognitoJwt } from "./auth/cognito-auth.js";
 import { healthRoute } from "./routes/health.route.js";
+import { meRoute } from "./routes/me.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
 import type { AuthContext } from "./types/auth.types.js";
+import type { CognitoAuthContext } from "./types/cognito.types.js";
 import {
   errorResponse,
   internalServerError,
@@ -27,6 +30,15 @@ async function protectedRoute(
   return response;
 }
 
+async function cognitoProtectedRoute(
+  event: APIGatewayProxyEvent,
+  route: (authContext: CognitoAuthContext) => Promise<APIGatewayProxyResult>
+) {
+  const authContext = await authenticateCognitoJwt(event);
+
+  return route(authContext);
+}
+
 export async function handler(event: APIGatewayProxyEvent) {
   try {
     const method = event.httpMethod;
@@ -45,6 +57,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/moderation-logs") {
       return await protectedRoute(event, (authContext) =>
         moderationLogsRoute(authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/me") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        meRoute(authContext)
       );
     }
 

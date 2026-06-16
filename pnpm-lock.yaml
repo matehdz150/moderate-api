@@ -23,6 +23,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1069.0
         version: 3.1069.0
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
@@ -407,6 +410,9 @@ packages:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
+
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
 
   mnemonist@0.38.3:
     resolution: {integrity: sha512-2K9QYubXx/NAjv4VLq1d1Ly8pWNC5L3BrixtdkyTegXWJIqY+zLNDhhX/A+ZwWt70tB1S8H4BE8FLYEFyNoOBw==}
@@ -929,6 +935,8 @@ snapshots:
 
   fsevents@2.3.3:
     optional: true
+
+  jose@6.2.3: {}
 
   mnemonist@0.38.3:
     dependencies:

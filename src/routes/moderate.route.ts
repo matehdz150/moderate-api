@@ -1,7 +1,9 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { mapRekognitionLabelsToModerationResponse } from "../mappers/moderation.mapper.js";
+import { saveModerationLog } from "../repositories/moderation-log.repository.js";
 import { detectModerationLabels } from "../services/rekognition.service.js";
+import type { AuthContext } from "../types/auth.types.js";
 import type { ModerateImageRequest } from "../types/moderation.types.js";
 import { badRequest, HttpError, ok } from "../utils/http-response.js";
 
@@ -53,7 +55,10 @@ function mapModerationError(error: unknown): never {
   throw error;
 }
 
-export async function moderateRoute(event: APIGatewayProxyEvent) {
+export async function moderateRoute(
+  event: APIGatewayProxyEvent,
+  authContext: AuthContext
+) {
   if (!BUCKET_NAME) {
     throw new Error("IMAGES_BUCKET_NAME is not configured");
   }
@@ -67,6 +72,18 @@ export async function moderateRoute(event: APIGatewayProxyEvent) {
   try {
     const labels = await detectModerationLabels(BUCKET_NAME, body.imageKey);
     const response = mapRekognitionLabelsToModerationResponse(labels);
+
+    await saveModerationLog({
+      moderationId: response.moderationId,
+      accountId: authContext.accountId,
+      projectId: authContext.projectId,
+      planId: authContext.planId,
+      imageKey: body.imageKey,
+      safe: response.safe,
+      action: response.action,
+      labels: response.labels,
+      createdAt: new Date().toISOString(),
+    });
 
     return ok(response);
   } catch (error) {

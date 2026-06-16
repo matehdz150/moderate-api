@@ -22,3 +22,15 @@ export interface UploadUrlResponse {
   uploadUrl: string;
   imageKey: string;
 }
+
+export interface ModerationLogRecord {
+  moderationId: string;
+  accountId: string;
+  projectId: string;
+  planId: string;
+  imageKey: string;
+  safe: boolean;
+  action: ModerationAction;
+  labels: ModerationLabel[];
+  createdAt: string;
+}

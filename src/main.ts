@@ -4,6 +4,7 @@ import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
 import { healthRoute } from "./routes/health.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
+import type { AuthContext } from "./types/auth.types.js";
 import {
   errorResponse,
   internalServerError,
@@ -13,10 +14,10 @@ import {
 
 async function protectedRoute(
   event: APIGatewayProxyEvent,
-  route: () => Promise<APIGatewayProxyResult>
+  route: (authContext: AuthContext) => Promise<APIGatewayProxyResult>
 ) {
   const authContext = await authenticateApiKey(event);
-  const response = await route();
+  const response = await route(authContext);
 
   if (response.statusCode < 400) {
     await recordUsage(authContext);
@@ -31,7 +32,9 @@ export async function handler(event: APIGatewayProxyEvent) {
     const path = event.path;
 
     if (method === "POST" && path === "/moderate") {
-      return await protectedRoute(event, () => moderateRoute(event));
+      return await protectedRoute(event, (authContext) =>
+        moderateRoute(event, authContext)
+      );
     }
 
     if (method === "POST" && path === "/upload-url") {

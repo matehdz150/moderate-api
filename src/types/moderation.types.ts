@@ -1,3 +1,8 @@
+import type {
+  ModerationCategory,
+  ModerationDecisionAction,
+} from "./policy.types.js";
+
 export interface ModerateImageRequest {
   imageKey: string;
 }
@@ -5,16 +10,17 @@ export interface ModerateImageRequest {
 export interface ModerationLabel {
   name: string;
   confidence: number;
+  category?: ModerationCategory;
 }
 
-export type ModerationAction =
-  | "allow"
-  | "reject";
+export type ModerationAction = ModerationDecisionAction;
 
 export interface ModerationResponse {
   moderationId: string;
   safe: boolean;
   action: ModerationAction;
+  riskScore?: number;
+  category?: ModerationCategory | null;
   labels: ModerationLabel[];
 }
 
@@ -31,6 +37,9 @@ export interface ModerationLogRecord {
   imageKey: string;
   safe: boolean;
   action: ModerationAction;
+  riskScore?: number;
+  category?: ModerationCategory | null;
+  policyMode?: string;
   labels: ModerationLabel[];
   createdAt: string;
 }

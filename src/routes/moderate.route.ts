@@ -1,8 +1,13 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
+import { ulid } from "ulid";
 
-import { mapRekognitionLabelsToModerationResponse } from "../mappers/moderation.mapper.js";
+import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { saveModerationLog } from "../repositories/moderation-log.repository.js";
 import { detectModerationLabels } from "../services/rekognition.service.js";
+import {
+  evaluateModerationPolicy,
+  getDefaultModerationPolicy,
+} from "../services/policy-engine.service.js";
 import type { AuthContext } from "../types/auth.types.js";
 import type { ModerateImageRequest } from "../types/moderation.types.js";
 import { badRequest, HttpError, ok } from "../utils/http-response.js";
@@ -73,7 +78,21 @@ export async function moderateRoute(
 
   try {
     const labels = await detectModerationLabels(BUCKET_NAME, body.imageKey);
-    const response = mapRekognitionLabelsToModerationResponse(labels);
+    const policy =
+      (await getPolicyByProjectId(authContext.projectId)) ??
+      getDefaultModerationPolicy(authContext.projectId);
+    const decision = evaluateModerationPolicy({
+      moderationLabels: labels,
+      policy,
+    });
+    const response = {
+      moderationId: `mod_${ulid()}`,
+      safe: decision.safe,
+      action: decision.action,
+      riskScore: decision.riskScore,
+      category: decision.category,
+      labels: decision.labels,
+    };
 
     await saveModerationLog({
       moderationId: response.moderationId,
@@ -83,6 +102,9 @@ export async function moderateRoute(
       imageKey: body.imageKey,
       safe: response.safe,
       action: response.action,
+      riskScore: response.riskScore,
+      category: response.category,
+      policyMode: policy.mode,
       labels: response.labels,
       createdAt: new Date().toISOString(),
     });

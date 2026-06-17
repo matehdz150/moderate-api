@@ -2,6 +2,10 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
 import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
 import { authenticateCognitoJwt } from "./auth/cognito-auth.js";
+import { authConfirmRoute } from "./routes/auth-confirm.route.js";
+import { authLoginRoute } from "./routes/auth-login.route.js";
+import { authRegisterRoute } from "./routes/auth-register.route.js";
+import { createApiKeyRoute } from "./routes/create-api-key.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
@@ -44,6 +48,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     const method = event.httpMethod;
     const path = event.path;
 
+    if (method === "POST" && path === "/auth/register") {
+      return await authRegisterRoute(event);
+    }
+
+    if (method === "POST" && path === "/auth/confirm") {
+      return await authConfirmRoute(event);
+    }
+
+    if (method === "POST" && path === "/auth/login") {
+      return await authLoginRoute(event);
+    }
+
     if (method === "POST" && path === "/moderate") {
       return await protectedRoute(event, (authContext) =>
         moderateRoute(event, authContext)
@@ -65,6 +81,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/me") {
       return await cognitoProtectedRoute(event, (authContext) =>
         meRoute(authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/api-keys") {
+      return await cognitoProtectedRoute(event, () =>
+        createApiKeyRoute(event)
       );
     }
 

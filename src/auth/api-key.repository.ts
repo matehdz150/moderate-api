@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
   GetCommand,
+  PutCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -50,6 +51,18 @@ export async function updateLastUsedAt(apiKeyHash: string): Promise<void> {
       ExpressionAttributeValues: {
         ":lastUsedAt": new Date().toISOString(),
       },
+    })
+  );
+}
+
+export async function createApiKeyRecord(
+  apiKeyRecord: ApiKeyRecord
+): Promise<void> {
+  await dynamoDbClient.send(
+    new PutCommand({
+      TableName: getApiKeysTableName(),
+      Item: apiKeyRecord,
+      ConditionExpression: "attribute_not_exists(apiKeyHash)",
     })
   );
 }

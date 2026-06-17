@@ -29,3 +29,14 @@ export interface AuthContext {
   monthlyLimit: number;
   requestsUsed: number;
 }
+
+export interface CreateApiKeyRequest {
+  accountId: string;
+  projectId: string;
+  planId: string;
+  monthlyLimit: number;
+}
+
+export interface CreateApiKeyResponse extends ApiKeyRecord {
+  rawApiKey: string;
+}

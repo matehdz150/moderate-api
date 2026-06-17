@@ -3,6 +3,8 @@ import { ulid } from "ulid";
 
 import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { saveModerationLog } from "../repositories/moderation-log.repository.js";
+import { evaluateBrandSafety } from "../services/brand-safety.service.js";
+import { evaluateCompliancePack } from "../services/compliance-packs.service.js";
 import { detectModerationLabels } from "../services/rekognition.service.js";
 import {
   evaluateModerationPolicy,
@@ -85,6 +87,18 @@ export async function moderateRoute(
       moderationLabels: labels,
       policy,
     });
+    const brandSafety = evaluateBrandSafety({
+      action: decision.action,
+      riskScore: decision.riskScore,
+      labels: decision.labels,
+      policy,
+    });
+    const compliance = policy.compliancePack
+      ? evaluateCompliancePack({
+          packName: policy.compliancePack,
+          moderationLabels: labels,
+        })
+      : undefined;
     const response = {
       moderationId: `mod_${ulid()}`,
       safe: decision.safe,
@@ -92,6 +106,8 @@ export async function moderateRoute(
       riskScore: decision.riskScore,
       category: decision.category,
       labels: decision.labels,
+      brandSafety,
+      ...(compliance ? { compliance } : {}),
     };
 
     await saveModerationLog({
@@ -106,6 +122,8 @@ export async function moderateRoute(
       category: response.category,
       policyMode: policy.mode,
       labels: response.labels,
+      brandSafety: response.brandSafety,
+      ...(compliance ? { compliance } : {}),
       createdAt: new Date().toISOString(),
     });
 

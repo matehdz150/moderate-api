@@ -1,3 +1,5 @@
+import type { BrandSafetyResult } from "./brand-safety.types.js";
+import type { ComplianceResult } from "./compliance.types.js";
 import type {
   ModerationCategory,
   ModerationDecisionAction,
@@ -22,6 +24,8 @@ export interface ModerationResponse {
   riskScore?: number;
   category?: ModerationCategory | null;
   labels: ModerationLabel[];
+  brandSafety?: BrandSafetyResult;
+  compliance?: ComplianceResult | null;
 }
 
 export interface UploadUrlResponse {
@@ -41,5 +45,7 @@ export interface ModerationLogRecord {
   category?: ModerationCategory | null;
   policyMode?: string;
   labels: ModerationLabel[];
+  brandSafety?: BrandSafetyResult;
+  compliance?: ComplianceResult | null;
   createdAt: string;
 }

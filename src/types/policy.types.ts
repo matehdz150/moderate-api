@@ -1,4 +1,5 @@
 import type { ModerationLabel } from "./moderation.types.js";
+import type { CompliancePack } from "./compliance.types.js";
 
 export type ModerationMode = "strict" | "balanced" | "relaxed";
 
@@ -17,6 +18,7 @@ export type ModerationDecisionAction = "allow" | "review" | "reject";
 export interface ModerationPolicy {
   projectId: string;
   mode: ModerationMode;
+  compliancePack?: CompliancePack;
   minConfidence: number;
   blockedCategories: ModerationCategory[];
   categoryActions: Partial<

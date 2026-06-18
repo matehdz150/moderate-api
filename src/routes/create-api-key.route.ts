@@ -1,21 +1,19 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
+import { listApiKeysByAccount } from "../auth/api-key.repository.js";
+import { getProjectById } from "../repositories/project.repository.js";
 import { createApiKey } from "../services/api-key.service.js";
 import type { CreateApiKeyRequest } from "../types/auth.types.js";
+import type { CognitoAuthContext } from "../types/cognito.types.js";
 import { ok, HttpError } from "../utils/http-response.js";
 import { parseJsonObjectBody } from "../utils/request-body.js";
+import { getDashboardAccountId } from "../utils/dashboard-account.js";
 
-function parseCreateApiKeyRequest(
-  event: APIGatewayProxyEvent
-): CreateApiKeyRequest {
+function parseCreateApiKeyRequest(event: APIGatewayProxyEvent): {
+  projectId: string;
+  name?: string;
+} {
   const body = parseJsonObjectBody(event.body);
-
-  if (
-    typeof body.accountId !== "string" ||
-    body.accountId.trim().length === 0
-  ) {
-    throw new HttpError(400, "accountId must be a non-empty string");
-  }
 
   if (
     typeof body.projectId !== "string" ||
@@ -24,28 +22,49 @@ function parseCreateApiKeyRequest(
     throw new HttpError(400, "projectId must be a non-empty string");
   }
 
-  if (typeof body.planId !== "string" || body.planId.trim().length === 0) {
-    throw new HttpError(400, "planId must be a non-empty string");
-  }
-
-  if (
-    typeof body.monthlyLimit !== "number" ||
-    !Number.isInteger(body.monthlyLimit) ||
-    body.monthlyLimit <= 0
-  ) {
-    throw new HttpError(400, "monthlyLimit must be a positive integer");
-  }
-
   return {
-    accountId: body.accountId.trim(),
     projectId: body.projectId.trim(),
-    planId: body.planId.trim(),
-    monthlyLimit: body.monthlyLimit,
+    ...(typeof body.name === "string" && body.name.trim().length > 0
+      ? { name: body.name.trim() }
+      : {}),
   };
 }
 
-export async function createApiKeyRoute(event: APIGatewayProxyEvent) {
-  const request = parseCreateApiKeyRequest(event);
+function maskApiKeyHash(apiKeyHash: string) {
+  return `${apiKeyHash.slice(0, 10)}...${apiKeyHash.slice(-6)}`;
+}
+
+export async function listApiKeysRoute(authContext: CognitoAuthContext) {
+  const accountId = getDashboardAccountId(authContext.userId);
+  const apiKeys = await listApiKeysByAccount(accountId);
+
+  return ok({
+    apiKeys: apiKeys.map((apiKey) => ({
+      ...apiKey,
+      apiKeyHash: maskApiKeyHash(apiKey.apiKeyHash),
+    })),
+  });
+}
+
+export async function createApiKeyRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const parsed = parseCreateApiKeyRequest(event);
+  const accountId = getDashboardAccountId(authContext.userId);
+  const project = await getProjectById({ accountId, projectId: parsed.projectId });
+
+  if (!project) {
+    throw new HttpError(404, "Project not found");
+  }
+
+  const request: CreateApiKeyRequest = {
+    accountId,
+    projectId: project.projectId,
+    planId: project.planId,
+    monthlyLimit: project.monthlyLimit,
+    ...(parsed.name ? { name: parsed.name } : {}),
+  };
   const response = await createApiKey(request);
 
   return ok(response);

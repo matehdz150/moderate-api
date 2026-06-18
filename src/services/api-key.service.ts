@@ -21,6 +21,7 @@ export async function createApiKey(
     status: "active" as const,
     monthlyLimit: request.monthlyLimit,
     createdAt,
+    ...(request.name ? { name: request.name } : {}),
   };
 
   await createApiKeyRecord(apiKeyRecord);

@@ -2,6 +2,7 @@ import {
   CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   InitiateAuthCommand,
+  ResendConfirmationCodeCommand,
   SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
@@ -53,6 +54,31 @@ function mapCognitoAuthError(error: unknown): never {
   throw error;
 }
 
+function mapResendConfirmationError(error: unknown): never {
+  const errorName = error instanceof Error ? error.name : undefined;
+
+  if (errorName === "UserNotFoundException") {
+    throw new HttpError(404, "User not found");
+  }
+
+  if (errorName === "InvalidParameterException") {
+    throw new HttpError(400, "User cannot receive a confirmation code");
+  }
+
+  if (
+    errorName === "LimitExceededException" ||
+    errorName === "TooManyRequestsException"
+  ) {
+    throw new HttpError(429, "Too many verification code requests. Try again later");
+  }
+
+  if (errorName === "CodeDeliveryFailureException") {
+    throw new HttpError(502, "Could not send verification code");
+  }
+
+  throw error;
+}
+
 export async function registerUser(email: string, password: string) {
   try {
     const result = await cognitoClient.send(
@@ -98,6 +124,24 @@ export async function confirmUserRegistration(
     };
   } catch (error) {
     mapCognitoAuthError(error);
+  }
+}
+
+export async function resendUserConfirmationCode(email: string) {
+  try {
+    await cognitoClient.send(
+      new ResendConfirmationCodeCommand({
+        ClientId: getCognitoClientId(),
+        Username: email,
+      })
+    );
+
+    return {
+      email,
+      resent: true,
+    };
+  } catch (error) {
+    mapResendConfirmationError(error);
   }
 }
 

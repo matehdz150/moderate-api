@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 import type { ModerationPolicy } from "../types/policy.types.js";
 
@@ -28,4 +28,13 @@ export async function getPolicyByProjectId(
   );
 
   return (result.Item as ModerationPolicy | undefined) ?? null;
+}
+
+export async function savePolicy(policy: ModerationPolicy): Promise<void> {
+  await dynamoDbClient.send(
+    new PutCommand({
+      TableName: getPoliciesTableName(),
+      Item: policy,
+    })
+  );
 }

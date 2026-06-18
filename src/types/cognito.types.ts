@@ -13,6 +13,10 @@ export interface ConfirmRegisterRequest {
   confirmationCode: string;
 }
 
+export interface ResendConfirmationRequest {
+  email: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

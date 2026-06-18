@@ -3,6 +3,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -65,4 +66,26 @@ export async function createApiKeyRecord(
       ConditionExpression: "attribute_not_exists(apiKeyHash)",
     })
   );
+}
+
+export async function listApiKeysByAccount(
+  accountId: string
+): Promise<ApiKeyRecord[]> {
+  const result = await dynamoDbClient.send(
+    new ScanCommand({
+      TableName: getApiKeysTableName(),
+      FilterExpression: "accountId = :accountId",
+      ExpressionAttributeValues: {
+        ":accountId": accountId,
+      },
+      ProjectionExpression:
+        "apiKeyHash, accountId, projectId, planId, #status, monthlyLimit, createdAt, lastUsedAt, #name",
+      ExpressionAttributeNames: {
+        "#status": "status",
+        "#name": "name",
+      },
+    })
+  );
+
+  return (result.Items as ApiKeyRecord[] | undefined) ?? [];
 }

@@ -5,11 +5,15 @@ import { authenticateCognitoJwt } from "./auth/cognito-auth.js";
 import { authConfirmRoute } from "./routes/auth-confirm.route.js";
 import { authLoginRoute } from "./routes/auth-login.route.js";
 import { authRegisterRoute } from "./routes/auth-register.route.js";
-import { createApiKeyRoute } from "./routes/create-api-key.route.js";
+import { authResendConfirmationRoute } from "./routes/auth-resend-confirmation.route.js";
+import { createApiKeyRoute, listApiKeysRoute } from "./routes/create-api-key.route.js";
+import { dashboardDataRoute } from "./routes/dashboard-data.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
+import { savePolicyRoute } from "./routes/policies.route.js";
+import { createProjectRoute, listProjectsRoute } from "./routes/projects.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
 import type { AuthContext } from "./types/auth.types.js";
 import type { CognitoAuthContext } from "./types/cognito.types.js";
@@ -56,6 +60,10 @@ export async function handler(event: APIGatewayProxyEvent) {
       return await authConfirmRoute(event);
     }
 
+    if (method === "POST" && path === "/auth/resend-confirmation") {
+      return await authResendConfirmationRoute(event);
+    }
+
     if (method === "POST" && path === "/auth/login") {
       return await authLoginRoute(event);
     }
@@ -84,9 +92,39 @@ export async function handler(event: APIGatewayProxyEvent) {
       );
     }
 
+    if (method === "GET" && path === "/dashboard-data") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        dashboardDataRoute(authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/projects") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        listProjectsRoute(authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/projects") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        createProjectRoute(event, authContext)
+      );
+    }
+
     if (method === "POST" && path === "/api-keys") {
-      return await cognitoProtectedRoute(event, () =>
-        createApiKeyRoute(event)
+      return await cognitoProtectedRoute(event, (authContext) =>
+        createApiKeyRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/api-keys") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        listApiKeysRoute(authContext)
+      );
+    }
+
+    if (method === "PUT" && path === "/policies") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        savePolicyRoute(event, authContext)
       );
     }
 

@@ -6,16 +6,49 @@ import { saveModerationLog } from "../repositories/moderation-log.repository.js"
 import { evaluateBrandSafety } from "../services/brand-safety.service.js";
 import { evaluateCompliancePack } from "../services/compliance-packs.service.js";
 import { detectModerationLabels } from "../services/rekognition.service.js";
+import { uploadImageObject } from "../services/s3.service.js";
 import {
   evaluateModerationPolicy,
   getDefaultModerationPolicy,
 } from "../services/policy-engine.service.js";
 import type { AuthContext } from "../types/auth.types.js";
 import type { ModerateImageRequest } from "../types/moderation.types.js";
-import { badRequest, HttpError, ok } from "../utils/http-response.js";
-import { assertImageKeyBelongsToProject } from "../utils/s3-key-scope.js";
+import { HttpError, ok } from "../utils/http-response.js";
+import { parseMultipartFiles } from "../utils/multipart-form-data.js";
+import {
+  assertImageKeyBelongsToProject,
+  buildUploadImageKey,
+} from "../utils/s3-key-scope.js";
 
 const BUCKET_NAME = process.env.IMAGES_BUCKET_NAME;
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const SUPPORTED_UPLOAD_TYPES = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/jpg", "jpg"],
+  ["image/png", "png"],
+]);
+
+interface ModerationImageSource {
+  imageKey: string;
+}
+
+function getHeader(event: APIGatewayProxyEvent, headerName: string) {
+  const normalizedHeaderName = headerName.toLowerCase();
+
+  for (const [key, value] of Object.entries(event.headers ?? {})) {
+    if (key.toLowerCase() === normalizedHeaderName) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function isMultipartRequest(event: APIGatewayProxyEvent) {
+  return getHeader(event, "content-type")
+    ?.toLowerCase()
+    .startsWith("multipart/form-data");
+}
 
 function parseModerateImageRequest(body: string): ModerateImageRequest {
   let parsedBody: unknown;
@@ -45,6 +78,69 @@ function parseModerateImageRequest(body: string): ModerateImageRequest {
   };
 }
 
+async function uploadModerationImage(
+  event: APIGatewayProxyEvent,
+  authContext: AuthContext
+): Promise<ModerationImageSource> {
+  if (!BUCKET_NAME) {
+    throw new Error("IMAGES_BUCKET_NAME is not configured");
+  }
+
+  const file = parseMultipartFiles(event).find((item) => item.fieldName === "image");
+
+  if (!file) {
+    throw new HttpError(400, "image file is required");
+  }
+
+  const normalizedContentType = file.contentType.toLowerCase();
+  const extension = SUPPORTED_UPLOAD_TYPES.get(normalizedContentType);
+
+  if (!extension) {
+    throw new HttpError(400, "Only JPEG and PNG images are supported");
+  }
+
+  if (file.content.length === 0) {
+    throw new HttpError(400, "image file must not be empty");
+  }
+
+  if (file.content.length > MAX_UPLOAD_BYTES) {
+    throw new HttpError(400, "Image file must be 8 MB or smaller");
+  }
+
+  const imageKey = buildUploadImageKey(
+    authContext.accountId,
+    authContext.projectId,
+    extension
+  );
+
+  await uploadImageObject({
+    bucketName: BUCKET_NAME,
+    imageKey,
+    contentType: normalizedContentType,
+    body: file.content,
+  });
+
+  return { imageKey };
+}
+
+async function getModerationImageSource(
+  event: APIGatewayProxyEvent,
+  authContext: AuthContext
+): Promise<ModerationImageSource> {
+  if (isMultipartRequest(event)) {
+    return uploadModerationImage(event, authContext);
+  }
+
+  if (!event.body) {
+    throw new HttpError(400, "Request body is required");
+  }
+
+  const body = parseModerateImageRequest(event.body);
+  assertImageKeyBelongsToProject(body.imageKey, authContext);
+
+  return { imageKey: body.imageKey };
+}
+
 function mapModerationError(error: unknown): never {
   const errorName = error instanceof Error ? error.name : undefined;
 
@@ -71,15 +167,9 @@ export async function moderateRoute(
     throw new Error("IMAGES_BUCKET_NAME is not configured");
   }
 
-  if (!event.body) {
-    return badRequest("Request body is required");
-  }
-
-  const body = parseModerateImageRequest(event.body);
-  assertImageKeyBelongsToProject(body.imageKey, authContext);
-
   try {
-    const labels = await detectModerationLabels(BUCKET_NAME, body.imageKey);
+    const imageSource = await getModerationImageSource(event, authContext);
+    const labels = await detectModerationLabels(BUCKET_NAME, imageSource.imageKey);
     const policy =
       (await getPolicyByProjectId(authContext.projectId)) ??
       getDefaultModerationPolicy(authContext.projectId);
@@ -115,7 +205,7 @@ export async function moderateRoute(
       accountId: authContext.accountId,
       projectId: authContext.projectId,
       planId: authContext.planId,
-      imageKey: body.imageKey,
+      imageKey: imageSource.imageKey,
       safe: response.safe,
       action: response.action,
       riskScore: response.riskScore,

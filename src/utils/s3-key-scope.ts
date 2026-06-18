@@ -7,8 +7,12 @@ export function getAllowedImagePrefix(accountId: string, projectId: string) {
   return `accounts/${accountId}/projects/${projectId}/uploads/`;
 }
 
-export function buildUploadImageKey(accountId: string, projectId: string) {
-  return `${getAllowedImagePrefix(accountId, projectId)}${ulid()}.jpg`;
+export function buildUploadImageKey(
+  accountId: string,
+  projectId: string,
+  extension = "jpg"
+) {
+  return `${getAllowedImagePrefix(accountId, projectId)}${ulid()}.${extension}`;
 }
 
 export function assertImageKeyBelongsToProject(

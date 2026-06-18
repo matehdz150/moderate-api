@@ -49,3 +49,23 @@ export async function listModerationLogsByProject(
 
   return (result.Items as ModerationLogRecord[] | undefined) ?? [];
 }
+
+export async function countModerationLogsByProjectSince(
+  projectId: string,
+  since: string
+): Promise<number> {
+  const result = await dynamoDbClient.send(
+    new QueryCommand({
+      TableName: getModerationLogsTableName(),
+      IndexName: "projectId-createdAt-index",
+      KeyConditionExpression: "projectId = :projectId AND createdAt >= :since",
+      ExpressionAttributeValues: {
+        ":projectId": projectId,
+        ":since": since,
+      },
+      Select: "COUNT",
+    })
+  );
+
+  return result.Count ?? 0;
+}

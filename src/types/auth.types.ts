@@ -9,6 +9,7 @@ export interface ApiKeyRecord {
   monthlyLimit: number;
   createdAt: string;
   lastUsedAt?: string;
+  name?: string;
 }
 
 export interface UsageRecord {
@@ -35,6 +36,7 @@ export interface CreateApiKeyRequest {
   projectId: string;
   planId: string;
   monthlyLimit: number;
+  name?: string;
 }
 
 export interface CreateApiKeyResponse extends ApiKeyRecord {

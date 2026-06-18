@@ -3,6 +3,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { getApiKeyByHash, updateLastUsedAt } from "./api-key.repository.js";
 import { getCurrentMonthUsage, incrementUsage } from "./usage.repository.js";
 import type { ApiKeyRecord, AuthContext } from "../types/auth.types.js";
+import { getPlanOverageConfig } from "../services/plan.service.js";
 import { hashApiKey } from "../utils/crypto.js";
 import { HttpError } from "../utils/http-response.js";
 
@@ -53,8 +54,9 @@ export async function authenticateApiKey(
 
   const usageRecord = await getCurrentMonthUsage(apiKeyRecord.accountId);
   const requestsUsed = usageRecord?.requestsUsed ?? 0;
+  const overageConfig = getPlanOverageConfig(apiKeyRecord.planId);
 
-  if (requestsUsed >= apiKeyRecord.monthlyLimit) {
+  if (!overageConfig.overageEnabled && requestsUsed >= apiKeyRecord.monthlyLimit) {
     throw new HttpError(429, "Monthly usage limit exceeded");
   }
 
@@ -64,6 +66,8 @@ export async function authenticateApiKey(
     projectId: apiKeyRecord.projectId,
     planId: apiKeyRecord.planId,
     monthlyLimit: apiKeyRecord.monthlyLimit,
+    overageEnabled: overageConfig.overageEnabled,
+    overagePriceCentsPerThousand: overageConfig.overagePriceCentsPerThousand,
     requestsUsed,
   };
 }
@@ -74,6 +78,10 @@ export async function recordUsage(authContext: AuthContext): Promise<void> {
       accountId: authContext.accountId,
       projectId: authContext.projectId,
       planId: authContext.planId,
+      monthlyLimit: authContext.monthlyLimit,
+      overageEnabled: authContext.overageEnabled,
+      overagePriceCentsPerThousand:
+        authContext.overagePriceCentsPerThousand,
     }),
     updateLastUsedAt(authContext.apiKeyHash),
   ]);

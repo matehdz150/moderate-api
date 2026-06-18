@@ -1,4 +1,5 @@
 import { listApiKeysByAccount } from "../auth/api-key.repository.js";
+import { getCurrentMonthUsage } from "../auth/usage.repository.js";
 import {
   countModerationLogsByProjectSince,
   listModerationLogsByProject,
@@ -43,6 +44,7 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
   const accountId = account.accountId;
   const projects = await listProjectsByAccount(accountId);
   const apiKeys = await listApiKeysByAccount(accountId);
+  const usage = await getCurrentMonthUsage(accountId);
   const monthStart = getMonthStartIso();
   const policies = await Promise.all(
     projects.map(async (project) =>
@@ -76,6 +78,16 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
     (total, item) => total + item.monthModerations,
     0
   );
+  const requestsUsed = usage?.requestsUsed ?? 0;
+  const overageEnabled = usage?.overageEnabled ?? account.planId !== "free";
+  const overageRequests = overageEnabled
+    ? Math.max(0, requestsUsed - account.monthlyLimit)
+    : 0;
+  const overagePriceCentsPerThousand =
+    usage?.overagePriceCentsPerThousand ?? 0;
+  const estimatedOverageCents = Math.ceil(
+    (overageRequests / 1000) * overagePriceCentsPerThousand
+  );
 
   return ok({
     account: {
@@ -103,6 +115,15 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
       rejected: moderationLogs.filter((log) => log.action === "reject").length,
       review: moderationLogs.filter((log) => log.action === "review").length,
       activeProjects: projects.length,
+    },
+    usage: {
+      month: usage?.month ?? new Date().toISOString().slice(0, 7),
+      requestsUsed,
+      monthlyLimit: account.monthlyLimit,
+      overageEnabled,
+      overageRequests,
+      overagePriceCentsPerThousand,
+      estimatedOverageCents,
     },
   });
 }

@@ -10,6 +10,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     apiKeyLimit: 1,
     logRetentionDays: 7,
     priceUsd: 0,
+    overageEnabled: false,
+    overagePriceCentsPerThousand: 0,
   },
   starter: {
     planId: "starter",
@@ -19,6 +21,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     apiKeyLimit: 3,
     logRetentionDays: 30,
     priceUsd: 29,
+    overageEnabled: true,
+    overagePriceCentsPerThousand: 400,
   },
   growth: {
     planId: "growth",
@@ -28,6 +32,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     apiKeyLimit: 10,
     logRetentionDays: 90,
     priceUsd: 149,
+    overageEnabled: true,
+    overagePriceCentsPerThousand: 300,
   },
   scale: {
     planId: "scale",
@@ -37,6 +43,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     apiKeyLimit: 50,
     logRetentionDays: 180,
     priceUsd: 399,
+    overageEnabled: true,
+    overagePriceCentsPerThousand: 250,
   },
 };
 
@@ -53,6 +61,22 @@ export function getPlanConfig(planId: PlanId): PlanConfig {
 
 export function getPlanRetentionDays(planId: string): number {
   return isPlanId(planId) ? PLAN_CONFIGS[planId].logRetentionDays : 7;
+}
+
+export function getPlanOverageConfig(planId: string) {
+  if (!isPlanId(planId)) {
+    return {
+      overageEnabled: false,
+      overagePriceCentsPerThousand: 0,
+    };
+  }
+
+  const plan = PLAN_CONFIGS[planId];
+
+  return {
+    overageEnabled: plan.overageEnabled,
+    overagePriceCentsPerThousand: plan.overagePriceCentsPerThousand,
+  };
 }
 
 export function parsePlanId(value: unknown): PlanId {

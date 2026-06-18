@@ -8,6 +8,8 @@ export interface PlanConfig {
   apiKeyLimit: number;
   logRetentionDays: number;
   priceUsd: number;
+  overageEnabled: boolean;
+  overagePriceCentsPerThousand: number;
 }
 
 export interface AccountRecord {

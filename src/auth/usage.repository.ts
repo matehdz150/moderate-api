@@ -13,6 +13,9 @@ interface IncrementUsageParams {
   accountId: string;
   projectId: string;
   planId: string;
+  monthlyLimit: number;
+  overageEnabled: boolean;
+  overagePriceCentsPerThousand: number;
 }
 
 function getUsageTableName() {
@@ -46,7 +49,7 @@ export async function getCurrentMonthUsage(
         usageKey,
       },
       ProjectionExpression:
-        "usageKey, accountId, projectId, planId, #month, requestsUsed, updatedAt",
+        "usageKey, accountId, projectId, planId, #month, requestsUsed, monthlyLimit, overageEnabled, overagePriceCentsPerThousand, updatedAt",
       ExpressionAttributeNames: {
         "#month": "month",
       },
@@ -69,7 +72,7 @@ export async function incrementUsage(
         usageKey: getUsageKey(params.accountId, month),
       },
       UpdateExpression:
-        "ADD requestsUsed :inc SET updatedAt = :updatedAt, accountId = :accountId, projectId = :projectId, planId = :planId, #month = :month",
+        "ADD requestsUsed :inc SET updatedAt = :updatedAt, accountId = :accountId, projectId = :projectId, planId = :planId, monthlyLimit = :monthlyLimit, overageEnabled = :overageEnabled, overagePriceCentsPerThousand = :overagePriceCentsPerThousand, #month = :month",
       ExpressionAttributeNames: {
         "#month": "month",
       },
@@ -79,6 +82,9 @@ export async function incrementUsage(
         ":accountId": params.accountId,
         ":projectId": params.projectId,
         ":planId": params.planId,
+        ":monthlyLimit": params.monthlyLimit,
+        ":overageEnabled": params.overageEnabled,
+        ":overagePriceCentsPerThousand": params.overagePriceCentsPerThousand,
         ":month": month,
       },
     })

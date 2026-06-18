@@ -19,6 +19,9 @@ export interface UsageRecord {
   planId: string;
   month: string;
   requestsUsed: number;
+  monthlyLimit?: number;
+  overageEnabled?: boolean;
+  overagePriceCentsPerThousand?: number;
   updatedAt: string;
 }
 
@@ -28,6 +31,8 @@ export interface AuthContext {
   projectId: string;
   planId: string;
   monthlyLimit: number;
+  overageEnabled: boolean;
+  overagePriceCentsPerThousand: number;
   requestsUsed: number;
 }
 

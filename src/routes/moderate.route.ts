@@ -4,7 +4,10 @@ import { ulid } from "ulid";
 import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { saveModerationLog } from "../repositories/moderation-log.repository.js";
 import { evaluateBrandSafety } from "../services/brand-safety.service.js";
-import { evaluateCompliancePack } from "../services/compliance-packs.service.js";
+import {
+  evaluateCompliancePack,
+  getCompliancePack,
+} from "../services/compliance-packs.service.js";
 import {
   detectGeneralLabels,
   detectModerationLabels,
@@ -22,6 +25,7 @@ import {
   assertImageKeyBelongsToProject,
   buildUploadImageKey,
 } from "../utils/s3-key-scope.js";
+import type { ModerationPolicy } from "../types/policy.types.js";
 
 const BUCKET_NAME = process.env.IMAGES_BUCKET_NAME;
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -162,6 +166,35 @@ function mapModerationError(error: unknown): never {
   throw error;
 }
 
+function policyRequiresSupplementalLabels(policy: ModerationPolicy) {
+  const supplementalCategories = new Set(["weapons", "drugs"]);
+  const categories = new Set([
+    ...policy.blockedCategories,
+    ...Object.keys(policy.categoryActions),
+  ]);
+
+  return Array.from(supplementalCategories).some((category) =>
+    categories.has(category)
+  );
+}
+
+function shouldDetectGeneralLabels(params: {
+  moderationOnlyDecision: ReturnType<typeof evaluateModerationPolicy>;
+  policy: ModerationPolicy;
+}) {
+  if (params.moderationOnlyDecision.labels.length === 0) {
+    return true;
+  }
+
+  if (!params.policy.compliancePack) {
+    return false;
+  }
+
+  return policyRequiresSupplementalLabels(
+    getCompliancePack(params.policy.compliancePack)
+  );
+}
+
 export async function moderateRoute(
   event: APIGatewayProxyEvent,
   authContext: AuthContext
@@ -172,13 +205,20 @@ export async function moderateRoute(
 
   try {
     const imageSource = await getModerationImageSource(event, authContext);
-    const [labels, generalLabels] = await Promise.all([
-      detectModerationLabels(BUCKET_NAME, imageSource.imageKey),
-      detectGeneralLabels(BUCKET_NAME, imageSource.imageKey),
-    ]);
     const policy =
       (await getPolicyByProjectId(authContext.projectId)) ??
       getDefaultModerationPolicy(authContext.projectId);
+    const labels = await detectModerationLabels(BUCKET_NAME, imageSource.imageKey);
+    const moderationOnlyDecision = evaluateModerationPolicy({
+      moderationLabels: labels,
+      policy,
+    });
+    const generalLabels = shouldDetectGeneralLabels({
+      moderationOnlyDecision,
+      policy,
+    })
+      ? await detectGeneralLabels(BUCKET_NAME, imageSource.imageKey)
+      : [];
     const decision = evaluateModerationPolicy({
       moderationLabels: labels,
       generalLabels,

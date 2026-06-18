@@ -90,6 +90,8 @@ export function getDefaultModerationPolicy(
       weapons: "reject",
       hate_symbols: "reject",
     },
+    reviewMode: "enabled",
+    reviewFallbackAction: "reject",
     reviewThreshold: 50,
     rejectThreshold: 80,
   };
@@ -317,6 +319,21 @@ function getFinalActionFromLabels(
   }, "allow");
 }
 
+function applyReviewMode(
+  action: ModerationDecisionAction,
+  policy: ModerationPolicy
+): ModerationDecisionAction {
+  if (action !== "review") {
+    return action;
+  }
+
+  if ((policy.reviewMode ?? "enabled") === "enabled") {
+    return action;
+  }
+
+  return policy.reviewFallbackAction ?? "reject";
+}
+
 export function evaluateModerationPolicy({
   moderationLabels,
   generalLabels = [],
@@ -344,7 +361,10 @@ export function evaluateModerationPolicy({
   const highestRiskLabel =
     labels.find((label) => label.confidence === riskScore) ?? null;
 
-  const action = getFinalActionFromLabels(labels, categoryActions, policy);
+  const action = applyReviewMode(
+    getFinalActionFromLabels(labels, categoryActions, policy),
+    policy
+  );
 
   return {
     safe: action === "allow",

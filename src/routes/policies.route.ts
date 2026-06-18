@@ -8,6 +8,8 @@ import type {
   ModerationDecisionAction,
   ModerationMode,
   ModerationPolicy,
+  ReviewFallbackAction,
+  ReviewMode,
 } from "../types/policy.types.js";
 import type { CompliancePack } from "../types/compliance.types.js";
 import { getDefaultModerationPolicy } from "../services/policy-engine.service.js";
@@ -27,6 +29,8 @@ const CATEGORIES = new Set<ModerationCategory>([
   "alcohol",
 ]);
 const ACTIONS = new Set<ModerationDecisionAction>(["allow", "review", "reject"]);
+const REVIEW_MODES = new Set<ReviewMode>(["enabled", "disabled"]);
+const REVIEW_FALLBACK_ACTIONS = new Set<ReviewFallbackAction>(["allow", "reject"]);
 const PACKS = new Set<CompliancePack>([
   "marketplace",
   "kids",
@@ -98,10 +102,13 @@ export async function savePolicyRoute(
   }
 
   const compliancePack = body.compliancePack;
+  const reviewMode = body.reviewMode;
+  const reviewFallbackAction = body.reviewFallbackAction;
   const existingPolicy = await getPolicyByProjectId(project.projectId);
+  const basePolicy = existingPolicy ?? getDefaultModerationPolicy(project.projectId);
   const now = new Date().toISOString();
   const policy: ModerationPolicy = {
-    ...(existingPolicy ?? getDefaultModerationPolicy(project.projectId)),
+    ...basePolicy,
     projectId: project.projectId,
     mode: mode as ModerationMode,
     minConfidence: requireNumber(body.minConfidence, "minConfidence"),
@@ -109,6 +116,15 @@ export async function savePolicyRoute(
     rejectThreshold: requireNumber(body.rejectThreshold, "rejectThreshold"),
     blockedCategories,
     categoryActions,
+    reviewMode:
+      typeof reviewMode === "string" && REVIEW_MODES.has(reviewMode as ReviewMode)
+        ? reviewMode as ReviewMode
+        : basePolicy.reviewMode ?? "enabled",
+    reviewFallbackAction:
+      typeof reviewFallbackAction === "string" &&
+      REVIEW_FALLBACK_ACTIONS.has(reviewFallbackAction as ReviewFallbackAction)
+        ? reviewFallbackAction as ReviewFallbackAction
+        : basePolicy.reviewFallbackAction ?? "reject",
     ...(typeof compliancePack === "string" && PACKS.has(compliancePack as CompliancePack)
       ? { compliancePack: compliancePack as CompliancePack }
       : { compliancePack: undefined }),

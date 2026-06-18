@@ -132,9 +132,34 @@ if (!allowNudityBrandSafety.safe || allowNudityBrandSafety.level !== "safe") {
   );
 }
 
+const disabledReviewPolicy = {
+  ...getDefaultModerationPolicy("proj_test"),
+  reviewMode: "disabled" as const,
+  reviewFallbackAction: "reject" as const,
+};
+const disabledReviewResult = evaluateModerationPolicy({
+  moderationLabels: [
+    { Name: "Drugs & Tobacco", Confidence: 91.25 },
+  ],
+  policy: disabledReviewPolicy,
+});
+
+assertDecision("disabled review fallback reject", disabledReviewResult, {
+  category: "drugs",
+  riskScore: 91.25,
+  safe: false,
+  action: "reject",
+});
+
 console.log(
   JSON.stringify(
-    { drugResult, weaponResult, allowNudityResult, allowNudityBrandSafety },
+    {
+      drugResult,
+      weaponResult,
+      allowNudityResult,
+      allowNudityBrandSafety,
+      disabledReviewResult,
+    },
     null,
     2
   )

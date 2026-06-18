@@ -14,6 +14,8 @@ export type ModerationCategory =
   | "alcohol";
 
 export type ModerationDecisionAction = "allow" | "review" | "reject";
+export type ReviewMode = "enabled" | "disabled";
+export type ReviewFallbackAction = "allow" | "reject";
 
 export interface ModerationPolicy {
   projectId: string;
@@ -24,6 +26,8 @@ export interface ModerationPolicy {
   categoryActions: Partial<
     Record<ModerationCategory, ModerationDecisionAction>
   >;
+  reviewMode: ReviewMode;
+  reviewFallbackAction: ReviewFallbackAction;
   reviewThreshold: number;
   rejectThreshold: number;
   createdAt?: string;

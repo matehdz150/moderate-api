@@ -4,11 +4,28 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({});
 
-export async function createUploadUrl(bucketName: string, imageKey: string) {
+interface S3RetentionTags {
+  planId: string;
+  retentionDays: number;
+}
+
+function buildTagging(tags: S3RetentionTags) {
+  return new URLSearchParams({
+    "visora-plan": tags.planId,
+    "visora-retention-days": String(tags.retentionDays),
+  }).toString();
+}
+
+export async function createUploadUrl(
+  bucketName: string,
+  imageKey: string,
+  retentionTags: S3RetentionTags
+) {
   const command = new PutObjectCommand({
     Bucket: bucketName,
     Key: imageKey,
     ContentType: "image/jpeg",
+    Tagging: buildTagging(retentionTags),
   });
 
   return getSignedUrl(s3Client, command, {
@@ -32,12 +49,14 @@ export async function uploadImageObject(params: {
   imageKey: string;
   contentType: string;
   body: Buffer;
+  retentionTags: S3RetentionTags;
 }) {
   await s3Client.send(
     new PutObjectCommand({
       Bucket: params.bucketName,
       Key: params.imageKey,
       ContentType: params.contentType,
+      Tagging: buildTagging(params.retentionTags),
       Body: params.body,
     })
   );

@@ -1,4 +1,5 @@
 import { createUploadUrl } from "../services/s3.service.js";
+import { getPlanRetentionDays } from "../services/plan.service.js";
 import type { AuthContext } from "../types/auth.types.js";
 import type { UploadUrlResponse } from "../types/moderation.types.js";
 import { ok } from "../utils/http-response.js";
@@ -15,7 +16,10 @@ export async function uploadUrlRoute(authContext: AuthContext) {
     authContext.accountId,
     authContext.projectId
   );
-  const uploadUrl = await createUploadUrl(BUCKET_NAME, imageKey);
+  const uploadUrl = await createUploadUrl(BUCKET_NAME, imageKey, {
+    planId: authContext.planId,
+    retentionDays: getPlanRetentionDays(authContext.planId),
+  });
 
   const response: UploadUrlResponse = {
     uploadUrl,

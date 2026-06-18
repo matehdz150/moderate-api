@@ -51,6 +51,10 @@ export function getPlanConfig(planId: PlanId): PlanConfig {
   return PLAN_CONFIGS[planId];
 }
 
+export function getPlanRetentionDays(planId: string): number {
+  return isPlanId(planId) ? PLAN_CONFIGS[planId].logRetentionDays : 7;
+}
+
 export function parsePlanId(value: unknown): PlanId {
   if (!isPlanId(value)) {
     throw new HttpError(400, "planId must be one of: free, starter, growth, scale");

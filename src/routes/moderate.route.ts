@@ -13,6 +13,7 @@ import {
   detectModerationLabels,
 } from "../services/rekognition.service.js";
 import { uploadImageObject } from "../services/s3.service.js";
+import { getPlanRetentionDays } from "../services/plan.service.js";
 import {
   evaluateModerationPolicy,
   getDefaultModerationPolicy,
@@ -125,6 +126,10 @@ async function uploadModerationImage(
     imageKey,
     contentType: normalizedContentType,
     body: file.content,
+    retentionTags: {
+      planId: authContext.planId,
+      retentionDays: getPlanRetentionDays(authContext.planId),
+    },
   });
 
   return { imageKey };

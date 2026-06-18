@@ -126,6 +126,9 @@ const CATEGORY_ALIASES: Record<ModerationCategory, string[]> = {
   weapons: [
     "weapon",
     "weapons",
+    "weaponry",
+    "weapons and military",
+    "military",
     "gun",
     "guns",
     "firearm",
@@ -233,6 +236,27 @@ function mapModerationLabel(
   };
 }
 
+function getGeneralLabelCategory(label: AwsLabel): ModerationCategory | null {
+  const candidates = [
+    label.Name,
+    ...(label.Parents ?? []).map((parent) => parent.Name),
+    ...(label.Aliases ?? []).map((alias) => alias.Name),
+    ...(label.Categories ?? []).map((category) => category.Name),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    const category = mapLabelNameToCategory(candidate);
+
+    if (category) {
+      return category;
+    }
+  }
+
+  return null;
+}
+
 function mapGeneralLabel(
   label: AwsLabel,
   minConfidence: number
@@ -243,7 +267,7 @@ function mapGeneralLabel(
     return null;
   }
 
-  const category = label.Name ? mapLabelNameToCategory(label.Name) : null;
+  const category = getGeneralLabelCategory(label);
 
   if (!category) {
     return null;

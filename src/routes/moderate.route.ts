@@ -5,7 +5,10 @@ import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { saveModerationLog } from "../repositories/moderation-log.repository.js";
 import { evaluateBrandSafety } from "../services/brand-safety.service.js";
 import { evaluateCompliancePack } from "../services/compliance-packs.service.js";
-import { detectModerationLabels } from "../services/rekognition.service.js";
+import {
+  detectGeneralLabels,
+  detectModerationLabels,
+} from "../services/rekognition.service.js";
 import { uploadImageObject } from "../services/s3.service.js";
 import {
   evaluateModerationPolicy,
@@ -169,12 +172,16 @@ export async function moderateRoute(
 
   try {
     const imageSource = await getModerationImageSource(event, authContext);
-    const labels = await detectModerationLabels(BUCKET_NAME, imageSource.imageKey);
+    const [labels, generalLabels] = await Promise.all([
+      detectModerationLabels(BUCKET_NAME, imageSource.imageKey),
+      detectGeneralLabels(BUCKET_NAME, imageSource.imageKey),
+    ]);
     const policy =
       (await getPolicyByProjectId(authContext.projectId)) ??
       getDefaultModerationPolicy(authContext.projectId);
     const decision = evaluateModerationPolicy({
       moderationLabels: labels,
+      generalLabels,
       policy,
     });
     const brandSafety = evaluateBrandSafety({
@@ -187,6 +194,7 @@ export async function moderateRoute(
       ? evaluateCompliancePack({
           packName: policy.compliancePack,
           moderationLabels: labels,
+          generalLabels,
         })
       : undefined;
     const response = {

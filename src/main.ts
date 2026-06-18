@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 
 import { authenticateApiKey, recordUsage } from "./auth/api-key-auth.js";
 import { authenticateCognitoJwt } from "./auth/cognito-auth.js";
+import { updateAccountPlanRoute } from "./routes/account-plan.route.js";
 import { authConfirmRoute } from "./routes/auth-confirm.route.js";
 import { authLoginRoute } from "./routes/auth-login.route.js";
 import { authRegisterRoute } from "./routes/auth-register.route.js";
@@ -95,6 +96,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/dashboard-data") {
       return await cognitoProtectedRoute(event, (authContext) =>
         dashboardDataRoute(authContext)
+      );
+    }
+
+    if (method === "PUT" && path === "/account/plan") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        updateAccountPlanRoute(event, authContext)
       );
     }
 

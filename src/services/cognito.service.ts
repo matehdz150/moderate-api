@@ -95,6 +95,10 @@ export async function registerUser(email: string, password: string) {
       })
     );
 
+    if (!result.UserSub) {
+      throw new HttpError(502, "Cognito did not return a user id");
+    }
+
     return {
       userId: result.UserSub,
       email,

@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { listProjectsByAccount } from "../repositories/project.repository.js";
+import { ensureAccountForUser } from "../services/account.service.js";
 import { createProject } from "../services/project.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
@@ -24,9 +25,21 @@ export async function createProjectRoute(
     throw new HttpError(400, "name must be a non-empty string");
   }
 
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const projects = await listProjectsByAccount(account.accountId);
+
+  if (projects.length >= account.projectLimit) {
+    throw new HttpError(403, "Project limit reached for current plan");
+  }
+
   const project = await createProject({
-    accountId: getDashboardAccountId(authContext.userId),
+    accountId: account.accountId,
     name: body.name.trim(),
+    planId: account.planId,
+    monthlyLimit: account.monthlyLimit,
   });
 
   return ok({ project });

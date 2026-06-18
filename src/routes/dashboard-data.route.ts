@@ -6,10 +6,10 @@ import {
 import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { listProjectsByAccount } from "../repositories/project.repository.js";
 import { getDefaultModerationPolicy } from "../services/policy-engine.service.js";
+import { ensureAccountForUser } from "../services/account.service.js";
 import { createImageReadUrl } from "../services/s3.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import type { ModerationLogRecord } from "../types/moderation.types.js";
-import { getDashboardAccountId } from "../utils/dashboard-account.js";
 import { ok } from "../utils/http-response.js";
 
 const BUCKET_NAME = process.env.IMAGES_BUCKET_NAME;
@@ -36,7 +36,11 @@ async function withImageUrls(logs: ModerationLogRecord[]) {
 }
 
 export async function dashboardDataRoute(authContext: CognitoAuthContext) {
-  const accountId = getDashboardAccountId(authContext.userId);
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const accountId = account.accountId;
   const projects = await listProjectsByAccount(accountId);
   const apiKeys = await listApiKeysByAccount(accountId);
   const monthStart = getMonthStartIso();
@@ -75,9 +79,14 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
 
   return ok({
     account: {
-      accountId,
-      email: authContext.email,
-      userId: authContext.userId,
+      accountId: account.accountId,
+      email: account.email,
+      userId: account.userId,
+      planId: account.planId,
+      monthlyLimit: account.monthlyLimit,
+      projectLimit: account.projectLimit,
+      apiKeyLimit: account.apiKeyLimit,
+      logRetentionDays: account.logRetentionDays,
     },
     projects: projects.map((project) => ({
       ...project,

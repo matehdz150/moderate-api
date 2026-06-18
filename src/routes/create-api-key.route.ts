@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { listApiKeysByAccount } from "../auth/api-key.repository.js";
 import { getProjectById } from "../repositories/project.repository.js";
+import { ensureAccountForUser } from "../services/account.service.js";
 import { createApiKey } from "../services/api-key.service.js";
 import type { CreateApiKeyRequest } from "../types/auth.types.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
@@ -51,18 +52,28 @@ export async function createApiKeyRoute(
   authContext: CognitoAuthContext
 ) {
   const parsed = parseCreateApiKeyRequest(event);
-  const accountId = getDashboardAccountId(authContext.userId);
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const accountId = account.accountId;
   const project = await getProjectById({ accountId, projectId: parsed.projectId });
 
   if (!project) {
     throw new HttpError(404, "Project not found");
   }
 
+  const apiKeys = await listApiKeysByAccount(accountId);
+
+  if (apiKeys.length >= account.apiKeyLimit) {
+    throw new HttpError(403, "API key limit reached for current plan");
+  }
+
   const request: CreateApiKeyRequest = {
     accountId,
     projectId: project.projectId,
-    planId: project.planId,
-    monthlyLimit: project.monthlyLimit,
+    planId: account.planId,
+    monthlyLimit: account.monthlyLimit,
     ...(parsed.name ? { name: parsed.name } : {}),
   };
   const response = await createApiKey(request);

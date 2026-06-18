@@ -4,6 +4,7 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 import type { ProjectRecord } from "../types/project.types.js";
@@ -60,5 +61,35 @@ export async function createProjectRecord(
       ConditionExpression:
         "attribute_not_exists(accountId) AND attribute_not_exists(projectId)",
     })
+  );
+}
+
+export async function updateProjectsPlanByAccount(params: {
+  accountId: string;
+  planId: string;
+  monthlyLimit: number;
+  updatedAt: string;
+}): Promise<void> {
+  const projects = await listProjectsByAccount(params.accountId);
+
+  await Promise.all(
+    projects.map((project) =>
+      dynamoDbClient.send(
+        new UpdateCommand({
+          TableName: getProjectsTableName(),
+          Key: {
+            accountId: project.accountId,
+            projectId: project.projectId,
+          },
+          UpdateExpression:
+            "SET planId = :planId, monthlyLimit = :monthlyLimit, updatedAt = :updatedAt",
+          ExpressionAttributeValues: {
+            ":planId": params.planId,
+            ":monthlyLimit": params.monthlyLimit,
+            ":updatedAt": params.updatedAt,
+          },
+        })
+      )
+    )
   );
 }

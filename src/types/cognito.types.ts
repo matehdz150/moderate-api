@@ -1,3 +1,5 @@
+import type { PlanId } from "./account.types.js";
+
 export interface CognitoAuthContext {
   userId: string;
   email: string;
@@ -6,6 +8,7 @@ export interface CognitoAuthContext {
 export interface RegisterRequest {
   email: string;
   password: string;
+  planId: PlanId;
 }
 
 export interface ConfirmRegisterRequest {

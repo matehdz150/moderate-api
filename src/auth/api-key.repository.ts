@@ -89,3 +89,30 @@ export async function listApiKeysByAccount(
 
   return (result.Items as ApiKeyRecord[] | undefined) ?? [];
 }
+
+export async function updateApiKeysPlanByAccount(params: {
+  accountId: string;
+  planId: string;
+  monthlyLimit: number;
+}): Promise<void> {
+  const apiKeys = await listApiKeysByAccount(params.accountId);
+
+  await Promise.all(
+    apiKeys.map((apiKey) =>
+      dynamoDbClient.send(
+        new UpdateCommand({
+          TableName: getApiKeysTableName(),
+          Key: {
+            apiKeyHash: apiKey.apiKeyHash,
+          },
+          UpdateExpression:
+            "SET planId = :planId, monthlyLimit = :monthlyLimit",
+          ExpressionAttributeValues: {
+            ":planId": params.planId,
+            ":monthlyLimit": params.monthlyLimit,
+          },
+        })
+      )
+    )
+  );
+}

@@ -8,6 +8,8 @@ import { getDefaultModerationPolicy } from "./policy-engine.service.js";
 export async function createProject(params: {
   accountId: string;
   name: string;
+  planId: string;
+  monthlyLimit: number;
 }): Promise<ProjectRecord> {
   const now = new Date().toISOString();
   const projectId = `proj_${ulid().toLowerCase()}`;
@@ -15,8 +17,8 @@ export async function createProject(params: {
     accountId: params.accountId,
     projectId,
     name: params.name,
-    planId: "free",
-    monthlyLimit: 1000,
+    planId: params.planId,
+    monthlyLimit: params.monthlyLimit,
     createdAt: now,
     updatedAt: now,
   };

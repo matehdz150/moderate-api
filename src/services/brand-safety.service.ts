@@ -48,6 +48,10 @@ function getLevel(params: EvaluateBrandSafetyParams) {
     return "caution";
   }
 
+  if (params.action === "allow") {
+    return "safe";
+  }
+
   const categories = uniqueCategories(params.labels);
   const hasUnsafeCategory = categories.some((category) =>
     UNSAFE_CATEGORIES.has(category)

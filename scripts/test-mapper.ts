@@ -7,6 +7,7 @@ import {
   evaluateModerationPolicy,
   getDefaultModerationPolicy,
 } from "../src/services/policy-engine.service.js";
+import { evaluateBrandSafety } from "../src/services/brand-safety.service.js";
 
 function assertDecision(
   name: string,
@@ -99,4 +100,42 @@ assertDecision("weapon general labels", weaponResult, {
   action: "reject",
 });
 
-console.log(JSON.stringify({ drugResult, weaponResult }, null, 2));
+const allowNudityPolicy = {
+  ...getDefaultModerationPolicy("proj_test"),
+  categoryActions: {
+    ...getDefaultModerationPolicy("proj_test").categoryActions,
+    nudity: "allow" as const,
+  },
+};
+const allowNudityResult = evaluateModerationPolicy({
+  moderationLabels: [{ Name: "Explicit Nudity", Confidence: 98.5 }],
+  policy: allowNudityPolicy,
+});
+
+assertDecision("allowed nudity policy", allowNudityResult, {
+  category: "nudity",
+  riskScore: 98.5,
+  safe: true,
+  action: "allow",
+});
+
+const allowNudityBrandSafety = evaluateBrandSafety({
+  action: allowNudityResult.action,
+  riskScore: allowNudityResult.riskScore,
+  labels: allowNudityResult.labels,
+  policy: allowNudityPolicy,
+});
+
+if (!allowNudityBrandSafety.safe || allowNudityBrandSafety.level !== "safe") {
+  throw new Error(
+    `allowed nudity policy: expected brandSafety safe, got ${allowNudityBrandSafety.level}`
+  );
+}
+
+console.log(
+  JSON.stringify(
+    { drugResult, weaponResult, allowNudityResult, allowNudityBrandSafety },
+    null,
+    2
+  )
+);

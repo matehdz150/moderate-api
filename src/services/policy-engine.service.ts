@@ -23,6 +23,12 @@ interface NormalizedLabel {
   category: ModerationCategory;
 }
 
+const ACTION_SEVERITY: Record<ModerationDecisionAction, number> = {
+  allow: 0,
+  review: 1,
+  reject: 2,
+};
+
 const DEFAULT_BLOCKED_CATEGORIES: ModerationCategory[] = [
   "nudity",
   "suggestive",
@@ -295,6 +301,22 @@ function getFinalActionFromThresholds(
   return "allow";
 }
 
+function getFinalActionFromLabels(
+  labels: NormalizedLabel[],
+  categoryActions: Record<ModerationCategory, ModerationDecisionAction>,
+  policy: ModerationPolicy
+): ModerationDecisionAction {
+  return labels.reduce<ModerationDecisionAction>((highestAction, label) => {
+    const labelAction =
+      categoryActions[label.category] ??
+      getFinalActionFromThresholds(label.confidence, policy);
+
+    return ACTION_SEVERITY[labelAction] > ACTION_SEVERITY[highestAction]
+      ? labelAction
+      : highestAction;
+  }, "allow");
+}
+
 export function evaluateModerationPolicy({
   moderationLabels,
   generalLabels = [],
@@ -322,18 +344,7 @@ export function evaluateModerationPolicy({
   const highestRiskLabel =
     labels.find((label) => label.confidence === riskScore) ?? null;
 
-  const hasReject = labels.some(
-    (label) => categoryActions[label.category] === "reject"
-  );
-  const hasReview = labels.some(
-    (label) => categoryActions[label.category] === "review"
-  );
-
-  const action = hasReject
-    ? "reject"
-    : hasReview
-      ? "review"
-      : getFinalActionFromThresholds(riskScore, policy);
+  const action = getFinalActionFromLabels(labels, categoryActions, policy);
 
   return {
     safe: action === "allow",

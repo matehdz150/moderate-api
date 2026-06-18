@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-rekognition";
 
 const rekognitionClient = new RekognitionClient({});
+const REKOGNITION_MIN_CONFIDENCE = 40;
 
 export async function detectModerationLabels(
   bucketName: string,
@@ -17,7 +18,7 @@ export async function detectModerationLabels(
         Name: imageKey,
       },
     },
-    MinConfidence: 70,
+    MinConfidence: REKOGNITION_MIN_CONFIDENCE,
   });
 
   const result = await rekognitionClient.send(command);

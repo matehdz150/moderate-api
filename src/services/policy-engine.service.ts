@@ -90,86 +90,122 @@ export function getDefaultModerationPolicy(
 }
 
 function normalizeText(value: string) {
-  return value.trim().toLowerCase();
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
+
+const CATEGORY_ALIASES: Record<ModerationCategory, string[]> = {
+  nudity: [
+    "explicit nudity",
+    "nudity",
+    "graphic male nudity",
+    "graphic female nudity",
+    "sexual activity",
+    "exposed body parts",
+  ],
+  suggestive: [
+    "suggestive",
+    "female swimwear or underwear",
+    "male swimwear or underwear",
+    "partial nudity",
+    "revealing clothes",
+  ],
+  violence: [
+    "violence",
+    "graphic violence",
+    "weapon violence",
+    "physical violence",
+    "blood and gore",
+    "gore",
+  ],
+  weapons: [
+    "weapon",
+    "weapons",
+    "gun",
+    "guns",
+    "firearm",
+    "firearms",
+    "rifle",
+    "pistol",
+    "knife",
+    "knives",
+    "ammunition",
+    "bomb",
+    "explosives",
+  ],
+  drugs: [
+    "drug",
+    "drugs",
+    "drugs and tobacco",
+    "drug products",
+    "drug paraphernalia",
+    "pill",
+    "pills",
+    "tablet",
+    "tablets",
+    "capsule",
+    "capsules",
+    "syringe",
+    "syringes",
+    "narcotic",
+    "narcotics",
+    "cannabis",
+    "marijuana",
+    "weed",
+    "tobacco",
+    "smoking",
+  ],
+  hate_symbols: [
+    "hate symbols",
+    "hate symbol",
+    "nazi symbol",
+    "extremist",
+    "extremist symbol",
+    "white supremacy",
+  ],
+  gambling: [
+    "gambling",
+    "casino",
+    "slot machine",
+    "betting",
+    "lottery",
+  ],
+  alcohol: [
+    "alcohol",
+    "alcoholic beverage",
+    "beer",
+    "wine",
+    "liquor",
+    "spirits",
+  ],
+};
+
+const CATEGORY_MATCHERS = Object.entries(CATEGORY_ALIASES).flatMap(
+  ([category, aliases]) =>
+    aliases.map((alias) => ({
+      category: category as ModerationCategory,
+      alias: normalizeText(alias),
+    }))
+);
 
 function mapLabelNameToCategory(
   labelName: string
 ): ModerationCategory | null {
   const normalizedName = normalizeText(labelName);
+  const match = CATEGORY_MATCHERS.find(
+    ({ alias }) =>
+      normalizedName === alias ||
+      normalizedName.startsWith(`${alias} `) ||
+      normalizedName.endsWith(` ${alias}`) ||
+      normalizedName.includes(` ${alias} `)
+  );
 
-  if (
-    [
-      "explicit nudity",
-      "nudity",
-      "graphic male nudity",
-      "graphic female nudity",
-    ].includes(normalizedName)
-  ) {
-    return "nudity";
-  }
-
-  if (
-    [
-      "suggestive",
-      "female swimwear or underwear",
-      "male swimwear or underwear",
-    ].includes(normalizedName)
-  ) {
-    return "suggestive";
-  }
-
-  if (
-    [
-      "violence",
-      "graphic violence",
-      "weapon violence",
-      "physical violence",
-    ].includes(normalizedName)
-  ) {
-    return "violence";
-  }
-
-  if (
-    [
-      "weapon",
-      "weapons",
-      "gun",
-      "rifle",
-      "pistol",
-      "knife",
-      "ammunition",
-      "bomb",
-    ].includes(normalizedName)
-  ) {
-    return "weapons";
-  }
-
-  if (
-    ["drug", "drugs", "pill", "syringe", "narcotic"].includes(
-      normalizedName
-    )
-  ) {
-    return "drugs";
-  }
-
-  if (
-    ["hate symbols", "nazi symbol", "extremist"].includes(normalizedName)
-  ) {
-    return "hate_symbols";
-  }
-
-  if (
-    ["gambling", "casino", "slot machine"].includes(normalizedName)
-  ) {
-    return "gambling";
-  }
-
-  if (["alcohol", "beer", "wine", "liquor"].includes(normalizedName)) {
-    return "alcohol";
-  }
-
-  return null;
+  return match?.category ?? null;
 }
 
 function mapModerationLabel(

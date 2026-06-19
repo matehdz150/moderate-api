@@ -6,12 +6,16 @@ import { authRegisterRoute } from "./routes/auth-register.route.js";
 import { authResendConfirmationRoute } from "./routes/auth-resend-confirmation.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
-import { notFound } from "./utils/http-response.js";
+import { corsPreflight, notFound } from "./utils/http-response.js";
 
 export async function handler(event: APIGatewayProxyEvent) {
   return handleLambdaRoute(async () => {
     const method = event.httpMethod;
     const path = getRoutePath(event);
+
+    if (method === "OPTIONS") {
+      return corsPreflight();
+    }
 
     if (method === "POST" && path === "/auth/register") {
       return authRegisterRoute(event);

@@ -1,11 +1,17 @@
 import { randomBytes } from "node:crypto";
 
-import { createApiKeyRecord } from "../auth/api-key.repository.js";
+import {
+  createApiKeyRecord,
+  getApiKeyByHash,
+  revokeApiKey,
+} from "../auth/api-key.repository.js";
 import type {
+  ApiKeyRecord,
   CreateApiKeyRequest,
   CreateApiKeyResponse,
 } from "../types/auth.types.js";
 import { hashApiKey } from "../utils/crypto.js";
+import { HttpError } from "../utils/http-response.js";
 
 export async function createApiKey(
   request: CreateApiKeyRequest
@@ -29,5 +35,37 @@ export async function createApiKey(
   return {
     rawApiKey,
     ...apiKeyRecord,
+  };
+}
+
+export async function rotateApiKey(params: {
+  accountId: string;
+  apiKeyHash: string;
+}): Promise<{ revokedApiKey: ApiKeyRecord; apiKey: CreateApiKeyResponse }> {
+  const currentApiKey = await getApiKeyByHash(params.apiKeyHash);
+
+  if (!currentApiKey || currentApiKey.accountId !== params.accountId) {
+    throw new HttpError(404, "API key not found");
+  }
+
+  if (currentApiKey.status !== "active") {
+    throw new HttpError(403, "API key is not active");
+  }
+
+  const revokedApiKey = await revokeApiKey({
+    accountId: params.accountId,
+    apiKeyHash: params.apiKeyHash,
+  });
+  const apiKey = await createApiKey({
+    accountId: currentApiKey.accountId,
+    projectId: currentApiKey.projectId,
+    planId: currentApiKey.planId,
+    monthlyLimit: currentApiKey.monthlyLimit,
+    ...(currentApiKey.name ? { name: currentApiKey.name } : {}),
+  });
+
+  return {
+    revokedApiKey,
+    apiKey,
   };
 }

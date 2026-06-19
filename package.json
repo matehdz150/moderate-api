@@ -11,8 +11,12 @@
     "build:auth": "esbuild src/auth-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/auth-main.js",
     "build:dashboard": "esbuild src/dashboard-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/dashboard-main.js",
     "build:moderation": "esbuild src/moderation-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/moderation-main.js",
+    "build:client": "pnpm --filter @visoracloud/client build",
     "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:moderation",
-    "typecheck": "tsc --noEmit"
+    "build:all": "pnpm run build && pnpm run build:client",
+    "typecheck": "tsc --noEmit",
+    "typecheck:client": "pnpm --filter @visoracloud/client typecheck",
+    "typecheck:all": "pnpm run typecheck && pnpm run typecheck:client"
   },
   "keywords": [],
   "author": "",

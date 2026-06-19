@@ -5,12 +5,16 @@ import { moderateRoute } from "./routes/moderate.route.js";
 import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
 import { apiKeyProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
-import { notFound } from "./utils/http-response.js";
+import { corsPreflight, notFound } from "./utils/http-response.js";
 
 export async function handler(event: APIGatewayProxyEvent) {
   return handleLambdaRoute(async () => {
     const method = event.httpMethod;
     const path = getRoutePath(event);
+
+    if (method === "OPTIONS") {
+      return corsPreflight();
+    }
 
     if (method === "POST" && path === "/moderate") {
       return apiKeyProtectedRoute(event, (authContext) =>

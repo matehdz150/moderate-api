@@ -31,9 +31,10 @@ export async function getApiKeyByHash(
         apiKeyHash,
       },
       ProjectionExpression:
-        "apiKeyHash, accountId, projectId, planId, #status, monthlyLimit, createdAt, lastUsedAt",
+        "apiKeyHash, accountId, projectId, planId, #status, monthlyLimit, createdAt, lastUsedAt, #name",
       ExpressionAttributeNames: {
         "#status": "status",
+        "#name": "name",
       },
     })
   );
@@ -66,6 +67,59 @@ export async function createApiKeyRecord(
       ConditionExpression: "attribute_not_exists(apiKeyHash)",
     })
   );
+}
+
+export async function updateApiKeyName(params: {
+  accountId: string;
+  apiKeyHash: string;
+  name: string;
+}): Promise<ApiKeyRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getApiKeysTableName(),
+      Key: {
+        apiKeyHash: params.apiKeyHash,
+      },
+      ConditionExpression: "accountId = :accountId",
+      UpdateExpression: "SET #name = :name",
+      ExpressionAttributeNames: {
+        "#name": "name",
+      },
+      ExpressionAttributeValues: {
+        ":accountId": params.accountId,
+        ":name": params.name,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as ApiKeyRecord;
+}
+
+export async function revokeApiKey(params: {
+  accountId: string;
+  apiKeyHash: string;
+}): Promise<ApiKeyRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getApiKeysTableName(),
+      Key: {
+        apiKeyHash: params.apiKeyHash,
+      },
+      ConditionExpression: "accountId = :accountId",
+      UpdateExpression: "SET #status = :status",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":accountId": params.accountId,
+        ":status": "revoked",
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as ApiKeyRecord;
 }
 
 export async function listApiKeysByAccount(

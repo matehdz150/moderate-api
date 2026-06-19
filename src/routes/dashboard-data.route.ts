@@ -11,13 +11,10 @@ import { ensureAccountForUser } from "../services/account.service.js";
 import { createImageReadUrl } from "../services/s3.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import type { ModerationLogRecord } from "../types/moderation.types.js";
+import { toDashboardApiKey } from "../utils/api-key-presenter.js";
 import { ok } from "../utils/http-response.js";
 
 const BUCKET_NAME = process.env.IMAGES_BUCKET_NAME;
-
-function maskApiKeyHash(apiKeyHash: string) {
-  return `${apiKeyHash.slice(0, 10)}...${apiKeyHash.slice(-6)}`;
-}
 
 function getMonthStartIso(now = new Date()) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
@@ -104,10 +101,7 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
       ...project,
       monthModerations: monthlyCountByProject.get(project.projectId) ?? 0,
     })),
-    apiKeys: apiKeys.map((apiKey) => ({
-      ...apiKey,
-      apiKeyHash: maskApiKeyHash(apiKey.apiKeyHash),
-    })),
+    apiKeys: apiKeys.map(toDashboardApiKey),
     policies,
     moderationLogs: moderationLogsWithImageUrls,
     stats: {

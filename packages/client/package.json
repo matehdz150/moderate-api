@@ -1,0 +1,37 @@
+{
+  "name": "@visoracloud/client",
+  "version": "0.1.0",
+  "description": "Official Visora Cloud API client for Node.js and TypeScript",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "visora",
+    "moderation",
+    "image-moderation",
+    "brand-safety",
+    "api-client"
+  ],
+  "author": "Visora Cloud",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

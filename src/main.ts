@@ -7,7 +7,13 @@ import { authConfirmRoute } from "./routes/auth-confirm.route.js";
 import { authLoginRoute } from "./routes/auth-login.route.js";
 import { authRegisterRoute } from "./routes/auth-register.route.js";
 import { authResendConfirmationRoute } from "./routes/auth-resend-confirmation.route.js";
-import { createApiKeyRoute, listApiKeysRoute } from "./routes/create-api-key.route.js";
+import {
+  createApiKeyRoute,
+  listApiKeysRoute,
+  renameApiKeyRoute,
+  revokeApiKeyRoute,
+  rotateApiKeyRoute,
+} from "./routes/create-api-key.route.js";
 import { dashboardDataRoute } from "./routes/dashboard-data.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
@@ -126,6 +132,24 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/api-keys") {
       return await cognitoProtectedRoute(event, (authContext) =>
         listApiKeysRoute(authContext)
+      );
+    }
+
+    if (method === "PATCH" && path === "/api-keys") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        renameApiKeyRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/api-keys/revoke") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        revokeApiKeyRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/api-keys/rotate") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        rotateApiKeyRoute(event, authContext)
       );
     }
 

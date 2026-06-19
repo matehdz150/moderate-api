@@ -8,7 +8,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:mapper": "tsx scripts/test-mapper.ts",
     "create:test-api-key": "tsx scripts/create-test-api-key.ts",
-    "build": "esbuild src/main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/main.js",
+    "build:auth": "esbuild src/auth-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/auth-main.js",
+    "build:dashboard": "esbuild src/dashboard-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/dashboard-main.js",
+    "build:moderation": "esbuild src/moderation-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/moderation-main.js",
+    "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:moderation",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

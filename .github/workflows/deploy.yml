@@ -9,6 +9,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      AUTH_LAMBDA_FUNCTION_NAME: moderate-api-auth-lambda
+      DASHBOARD_LAMBDA_FUNCTION_NAME: moderate-api-dashboard-lambda
+      MODERATION_LAMBDA_FUNCTION_NAME: moderate-api-lambda
+
     permissions:
       contents: read
 
@@ -34,9 +39,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Package Lambda
+      - name: Package Lambdas
         run: |
-          zip -r function.zip dist
+          zip -r -FS function.zip dist
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -45,24 +50,68 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy Lambda
+      - name: Deploy Auth Lambda
         run: |
           aws lambda update-function-code \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --function-name "$AUTH_LAMBDA_FUNCTION_NAME" \
             --zip-file fileb://function.zip
 
-      - name: Wait for Lambda Code
+      - name: Wait for Auth Lambda Code
         run: |
           aws lambda wait function-updated \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"
+            --function-name "$AUTH_LAMBDA_FUNCTION_NAME"
 
-      - name: Configure Lambda Handler
+      - name: Configure Auth Lambda Handler
         run: |
           aws lambda update-function-configuration \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
-            --handler dist/main.handler
+            --function-name "$AUTH_LAMBDA_FUNCTION_NAME" \
+            --handler dist/auth-main.handler
 
-      - name: Wait for Lambda Configuration
+      - name: Wait for Auth Lambda Configuration
         run: |
           aws lambda wait function-updated \
-            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}"
+            --function-name "$AUTH_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Dashboard Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$DASHBOARD_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Dashboard Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$DASHBOARD_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Dashboard Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$DASHBOARD_LAMBDA_FUNCTION_NAME" \
+            --handler dist/dashboard-main.handler
+
+      - name: Wait for Dashboard Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$DASHBOARD_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Moderation Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$MODERATION_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Moderation Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$MODERATION_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Moderation Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$MODERATION_LAMBDA_FUNCTION_NAME" \
+            --handler dist/moderation-main.handler
+
+      - name: Wait for Moderation Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$MODERATION_LAMBDA_FUNCTION_NAME"

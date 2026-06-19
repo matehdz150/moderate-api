@@ -13,7 +13,12 @@ import { dashboardModerateRoute } from "./routes/dashboard-moderate.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
-import { createProjectRoute, listProjectsRoute } from "./routes/projects.route.js";
+import {
+  createProjectRoute,
+  deleteProjectRoute,
+  listProjectsRoute,
+  renameProjectRoute,
+} from "./routes/projects.route.js";
 import { cognitoProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
 import { corsPreflight, notFound } from "./utils/http-response.js";
 
@@ -51,6 +56,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/projects") {
       return cognitoProtectedRoute(event, (authContext) =>
         createProjectRoute(event, authContext)
+      );
+    }
+
+    if (method === "PATCH" && path === "/projects") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        renameProjectRoute(event, authContext)
+      );
+    }
+
+    if (method === "DELETE" && path === "/projects") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        deleteProjectRoute(event, authContext)
       );
     }
 

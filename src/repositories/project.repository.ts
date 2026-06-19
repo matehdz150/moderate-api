@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+  DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
@@ -62,6 +63,51 @@ export async function createProjectRecord(
         "attribute_not_exists(accountId) AND attribute_not_exists(projectId)",
     })
   );
+}
+
+export async function updateProjectName(params: {
+  accountId: string;
+  projectId: string;
+  name: string;
+  updatedAt: string;
+}): Promise<ProjectRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getProjectsTableName(),
+      Key: {
+        accountId: params.accountId,
+        projectId: params.projectId,
+      },
+      ConditionExpression: "attribute_exists(accountId) AND attribute_exists(projectId)",
+      UpdateExpression: "SET #name = :name, updatedAt = :updatedAt",
+      ExpressionAttributeNames: {
+        "#name": "name",
+      },
+      ExpressionAttributeValues: {
+        ":name": params.name,
+        ":updatedAt": params.updatedAt,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as ProjectRecord;
+}
+
+export async function deleteProjectRecord(params: {
+  accountId: string;
+  projectId: string;
+}): Promise<ProjectRecord> {
+  const result = await dynamoDbClient.send(
+    new DeleteCommand({
+      TableName: getProjectsTableName(),
+      Key: params,
+      ConditionExpression: "attribute_exists(accountId) AND attribute_exists(projectId)",
+      ReturnValues: "ALL_OLD",
+    })
+  );
+
+  return result.Attributes as ProjectRecord;
 }
 
 export async function updateProjectsPlanByAccount(params: {

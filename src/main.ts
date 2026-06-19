@@ -20,7 +20,12 @@ import { meRoute } from "./routes/me.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
-import { createProjectRoute, listProjectsRoute } from "./routes/projects.route.js";
+import {
+  createProjectRoute,
+  deleteProjectRoute,
+  listProjectsRoute,
+  renameProjectRoute,
+} from "./routes/projects.route.js";
 import { uploadUrlRoute } from "./routes/upload-url.route.js";
 import type { AuthContext } from "./types/auth.types.js";
 import type { CognitoAuthContext } from "./types/cognito.types.js";
@@ -120,6 +125,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/projects") {
       return await cognitoProtectedRoute(event, (authContext) =>
         createProjectRoute(event, authContext)
+      );
+    }
+
+    if (method === "PATCH" && path === "/projects") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        renameProjectRoute(event, authContext)
+      );
+    }
+
+    if (method === "DELETE" && path === "/projects") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        deleteProjectRoute(event, authContext)
       );
     }
 

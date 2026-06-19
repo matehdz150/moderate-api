@@ -144,6 +144,39 @@ export async function listApiKeysByAccount(
   return (result.Items as ApiKeyRecord[] | undefined) ?? [];
 }
 
+export async function revokeApiKeysByProject(params: {
+  accountId: string;
+  projectId: string;
+}): Promise<void> {
+  const apiKeys = await listApiKeysByAccount(params.accountId);
+  const projectApiKeys = apiKeys.filter(
+    (apiKey) => apiKey.projectId === params.projectId && apiKey.status === "active"
+  );
+
+  await Promise.all(
+    projectApiKeys.map((apiKey) =>
+      dynamoDbClient.send(
+        new UpdateCommand({
+          TableName: getApiKeysTableName(),
+          Key: {
+            apiKeyHash: apiKey.apiKeyHash,
+          },
+          ConditionExpression: "accountId = :accountId AND projectId = :projectId",
+          UpdateExpression: "SET #status = :status",
+          ExpressionAttributeNames: {
+            "#status": "status",
+          },
+          ExpressionAttributeValues: {
+            ":accountId": params.accountId,
+            ":projectId": params.projectId,
+            ":status": "revoked",
+          },
+        })
+      )
+    )
+  );
+}
+
 export async function updateApiKeysPlanByAccount(params: {
   accountId: string;
   planId: string;

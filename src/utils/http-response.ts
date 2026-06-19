@@ -16,7 +16,7 @@ export function jsonResponse(statusCode: number, body: unknown) {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers":
         "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,x-api-key",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     },
     body: JSON.stringify(body),
   };
@@ -29,7 +29,7 @@ export function corsPreflight() {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers":
         "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,x-api-key",
-      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
       "Access-Control-Max-Age": "86400",
     },
     body: "",

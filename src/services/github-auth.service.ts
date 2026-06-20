@@ -1,4 +1,4 @@
-import { ensureAccountForUser } from "./account.service.js";
+import { resolveAccountForIdentity } from "./account-identity.service.js";
 import { createDashboardJwt } from "../utils/app-jwt.js";
 import { HttpError } from "../utils/http-response.js";
 import type { LoginResponse } from "../types/cognito.types.js";
@@ -36,11 +36,11 @@ function getGitHubConfig() {
   return { clientId, clientSecret };
 }
 
-async function readJsonResponse<T>(response: Response): Promise<T> {
+async function readJsonResponse<T>(response: Response, failureMessage: string): Promise<T> {
   const payload = (await response.json().catch(() => null)) as T | null;
 
   if (!response.ok || !payload) {
-    throw new HttpError(401, "Could not verify GitHub account");
+    throw new HttpError(401, failureMessage);
   }
 
   return payload;
@@ -64,7 +64,10 @@ async function exchangeCodeForAccessToken(params: {
       redirect_uri: params.redirectUri,
     }),
   });
-  const payload = await readJsonResponse<GitHubTokenResponse>(response);
+  const payload = await readJsonResponse<GitHubTokenResponse>(
+    response,
+    "GitHub authorization code could not be verified"
+  );
 
   if (!payload.access_token) {
     throw new HttpError(401, payload.error_description ?? "Invalid GitHub authorization code");
@@ -79,9 +82,11 @@ async function fetchGitHubUser(accessToken: string) {
       headers: {
         Accept: "application/vnd.github+json",
         Authorization: "Bearer " + accessToken,
+        "User-Agent": "Visora",
         "X-GitHub-Api-Version": "2022-11-28",
       },
-    })
+    }),
+    "GitHub profile could not be verified"
   );
 }
 
@@ -95,9 +100,11 @@ async function fetchGitHubEmail(accessToken: string, fallbackEmail?: string | nu
       headers: {
         Accept: "application/vnd.github+json",
         Authorization: "Bearer " + accessToken,
+        "User-Agent": "Visora",
         "X-GitHub-Api-Version": "2022-11-28",
       },
-    })
+    }),
+    "GitHub email permission is required"
   );
   const email =
     emails.find((item) => item.primary && item.verified && item.email)?.email ??
@@ -126,17 +133,20 @@ export async function loginWithGitHub(params: {
   }
 
   const email = await fetchGitHubEmail(accessToken, githubUser.email);
-  const userId = "github_" + githubUser.id;
-
-  await ensureAccountForUser({
-    userId,
+  const githubUserId = String(githubUser.id);
+  const legacyUserId = "github_" + githubUserId;
+  const account = await resolveAccountForIdentity({
+    provider: "github",
+    providerUserId: githubUserId,
+    legacyUserId,
     email,
+    emailVerified: true,
     planId: params.planId,
   });
 
   const idToken = await createDashboardJwt({
-    userId,
-    email,
+    userId: account.userId,
+    email: account.email,
     provider: "github",
   });
 

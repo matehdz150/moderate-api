@@ -11,6 +11,10 @@ export async function createAccountForUser(params: {
   userId: string;
   email: string;
   planId: PlanId;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripeCurrentPeriodEnd?: string;
 }): Promise<AccountRecord> {
   const now = new Date().toISOString();
   const plan = getPlanConfig(params.planId);
@@ -23,6 +27,10 @@ export async function createAccountForUser(params: {
     projectLimit: plan.projectLimit,
     apiKeyLimit: plan.apiKeyLimit,
     logRetentionDays: plan.logRetentionDays,
+    ...(params.stripeCustomerId ? { stripeCustomerId: params.stripeCustomerId } : {}),
+    ...(params.stripeSubscriptionId ? { stripeSubscriptionId: params.stripeSubscriptionId } : {}),
+    ...(params.stripeSubscriptionStatus ? { stripeSubscriptionStatus: params.stripeSubscriptionStatus } : {}),
+    ...(params.stripeCurrentPeriodEnd ? { stripeCurrentPeriodEnd: params.stripeCurrentPeriodEnd } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -54,6 +62,10 @@ export async function ensureAccountForUser(params: {
 export async function changeAccountPlan(params: {
   accountId: string;
   planId: PlanId;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripeCurrentPeriodEnd?: string;
 }): Promise<AccountRecord> {
   const now = new Date().toISOString();
   const plan = getPlanConfig(params.planId);
@@ -65,6 +77,10 @@ export async function changeAccountPlan(params: {
     projectLimit: plan.projectLimit,
     apiKeyLimit: plan.apiKeyLimit,
     logRetentionDays: plan.logRetentionDays,
+    stripeCustomerId: params.stripeCustomerId,
+    stripeSubscriptionId: params.stripeSubscriptionId,
+    stripeSubscriptionStatus: params.stripeSubscriptionStatus,
+    stripeCurrentPeriodEnd: params.stripeCurrentPeriodEnd,
     updatedAt: now,
   });
 }

@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
-import { createAccountForUser } from "../services/account.service.js";
+import { resolveAccountForIdentity } from "../services/account-identity.service.js";
 import { registerUser } from "../services/cognito.service.js";
 import { parsePlanId } from "../services/plan.service.js";
 import type { RegisterRequest } from "../types/cognito.types.js";
@@ -34,9 +34,12 @@ export async function authRegisterRoute(event: APIGatewayProxyEvent) {
 
   try {
     const response = await registerUser(request.email, request.password);
-    const account = await createAccountForUser({
-      userId: response.userId,
+    const account = await resolveAccountForIdentity({
+      provider: "cognito",
+      providerUserId: response.userId,
+      legacyUserId: response.userId,
       email: request.email,
+      emailVerified: true,
       planId: request.planId,
     });
 

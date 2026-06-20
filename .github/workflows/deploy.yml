@@ -12,6 +12,7 @@ jobs:
     env:
       AUTH_LAMBDA_FUNCTION_NAME: moderate-api-auth-lambda
       DASHBOARD_LAMBDA_FUNCTION_NAME: moderate-api-dashboard-lambda
+      BILLING_LAMBDA_FUNCTION_NAME: moderate-api-billing-lambda
       MODERATION_LAMBDA_FUNCTION_NAME: moderate-api-lambda
       WEBHOOK_LAMBDA_FUNCTION_NAME: moderate-api-webhook-lambda
 
@@ -94,6 +95,28 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name "$DASHBOARD_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Billing Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$BILLING_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Billing Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$BILLING_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Billing Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$BILLING_LAMBDA_FUNCTION_NAME" \
+            --handler dist/billing-main.handler
+
+      - name: Wait for Billing Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$BILLING_LAMBDA_FUNCTION_NAME"
 
       - name: Deploy Moderation Lambda
         run: |

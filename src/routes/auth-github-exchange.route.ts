@@ -21,7 +21,7 @@ function parseGitHubExchangeRequest(event: APIGatewayProxyEvent): GitHubExchange
   return {
     code: body.code.trim(),
     redirectUri: body.redirectUri.trim(),
-    planId: parsePlanId(body.planId),
+    planId: body.planId === undefined ? "free" : parsePlanId(body.planId),
   };
 }
 

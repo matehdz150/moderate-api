@@ -21,6 +21,22 @@ export interface AccountRecord {
   projectLimit: number;
   apiKeyLimit: number;
   logRetentionDays: number;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  stripeCurrentPeriodEnd?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AccountIdentityProvider = "cognito" | "google" | "github";
+
+export interface AccountIdentityRecord {
+  identityKey: string;
+  provider: AccountIdentityProvider;
+  providerUserId: string;
+  accountId: string;
+  email: string;
   createdAt: string;
   updatedAt: string;
 }

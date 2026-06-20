@@ -32,6 +32,9 @@ importers:
       jose:
         specifier: ^6.2.3
         version: 6.2.3
+      stripe:
+        specifier: ^22.2.2
+        version: 22.2.2(@types/node@25.9.3)
       ulid:
         specifier: ^3.0.2
         version: 3.0.2
@@ -487,6 +490,15 @@ packages:
   path-expression-matcher@1.5.0:
     resolution: {integrity: sha512-cbrerZV+6rvdQrrD+iGMcZFEiiSrbv9Tfdkvnusy6y0x0GKBXREFg/Y65GhIfm0tnLntThhzCnfKwp1WRjeCyQ==}
     engines: {node: '>=14.0.0'}
+
+  stripe@22.2.2:
+    resolution: {integrity: sha512-lRXLiarjW/I2QVa6QuFfz1Ma7Dc2yBQ7vlYH6NEmp5htMJNQGfiWExmOv0McfqY5wMCGV8DLuCvsyVRIPJlUUQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strnum@2.4.0:
     resolution: {integrity: sha512-sHrVyWWdq28RbhjuJdZsA1SnGRJV6NiXbk6AXBxDOsgAcA+lmpUZCYjOdLBxkXMwis6RRe7dlZt4VlIWFVzkmg==}
@@ -1160,6 +1172,10 @@ snapshots:
   obliterator@1.6.1: {}
 
   path-expression-matcher@1.5.0: {}
+
+  stripe@22.2.2(@types/node@25.9.3):
+    optionalDependencies:
+      '@types/node': 25.9.3
 
   strnum@2.4.0:
     dependencies:

@@ -6,6 +6,7 @@ import { parsePlanId } from "../services/plan.service.js";
 import type { RegisterRequest } from "../types/cognito.types.js";
 import { ok, HttpError } from "../utils/http-response.js";
 import { parseJsonObjectBody } from "../utils/request-body.js";
+import { logError } from "../utils/structured-log.js";
 
 function parseRegisterRequest(event: APIGatewayProxyEvent): RegisterRequest {
   const body = parseJsonObjectBody(event.body);
@@ -30,15 +31,28 @@ function parseRegisterRequest(event: APIGatewayProxyEvent): RegisterRequest {
 
 export async function authRegisterRoute(event: APIGatewayProxyEvent) {
   const request = parseRegisterRequest(event);
-  const response = await registerUser(request.email, request.password);
-  const account = await createAccountForUser({
-    userId: response.userId,
-    email: request.email,
-    planId: request.planId,
-  });
 
-  return ok({
-    ...response,
-    account,
-  });
+  try {
+    const response = await registerUser(request.email, request.password);
+    const account = await createAccountForUser({
+      userId: response.userId,
+      email: request.email,
+      planId: request.planId,
+    });
+
+    return ok({
+      ...response,
+      account,
+    });
+  } catch (error) {
+    if (!(error instanceof HttpError) || error.statusCode >= 500) {
+      logError("auth_register_error", {
+      requestId: event.requestContext.requestId,
+      route: "POST /auth/register",
+      planId: request.planId,
+      error,
+    });
+    }
+    throw error;
+  }
 }

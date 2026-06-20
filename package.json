@@ -18,7 +18,8 @@
     "typecheck:client": "pnpm --filter @visoracloud/client typecheck",
     "typecheck:all": "pnpm run typecheck && pnpm run typecheck:client",
     "build:webhook": "esbuild src/webhook-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/webhook-main.js",
-    "setup:webhooks": "tsx scripts/setup-webhooks-infra.ts"
+    "setup:webhooks": "tsx scripts/setup-webhooks-infra.ts",
+    "setup:observability": "bash scripts/setup-cloudwatch-observability.sh"
   },
   "keywords": [],
   "author": "",

@@ -2,6 +2,7 @@ import type { SQSEvent, SQSBatchResponse } from "aws-lambda";
 
 import { deliverWebhookEvent } from "./services/webhook-delivery.service.js";
 import type { WebhookQueueMessage } from "./types/webhook.types.js";
+import { logError } from "./utils/structured-log.js";
 
 function parseMessage(body: string): WebhookQueueMessage {
   const parsed = JSON.parse(body) as Partial<WebhookQueueMessage>;
@@ -21,7 +22,9 @@ export async function handler(event: SQSEvent): Promise<SQSBatchResponse> {
       const message = parseMessage(record.body);
       await deliverWebhookEvent(message.eventId);
     } catch (error) {
-      console.error("Webhook delivery failed", {
+      logError("webhook_queue_message_failed", {
+        requestId: record.messageId,
+        route: "SQS webhook delivery",
         messageId: record.messageId,
         error,
       });

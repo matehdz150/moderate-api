@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { updateAccountPlanRoute } from "./routes/account-plan.route.js";
+import { adminOverviewRoute } from "./routes/admin-overview.route.js";
 import {
   createApiKeyRoute,
   listApiKeysRoute,
@@ -14,7 +15,12 @@ import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
 import { decideReviewQueueRoute, listReviewQueueRoute } from "./routes/review-queue.route.js";
-import { createWebhookRoute, deleteWebhookRoute, listWebhooksRoute } from "./routes/webhooks.route.js";
+import {
+  createWebhookRoute,
+  deleteWebhookRoute,
+  listWebhookEventsRoute,
+  listWebhooksRoute,
+} from "./routes/webhooks.route.js";
 import {
   createProjectRoute,
   deleteProjectRoute,
@@ -25,7 +31,7 @@ import { cognitoProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/
 import { corsPreflight, notFound } from "./utils/http-response.js";
 
 export async function handler(event: APIGatewayProxyEvent) {
-  return handleLambdaRoute(async () => {
+  return handleLambdaRoute(event, async () => {
     const method = event.httpMethod;
     const path = getRoutePath(event);
 
@@ -40,6 +46,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/dashboard-data") {
       return cognitoProtectedRoute(event, (authContext) =>
         dashboardDataRoute(authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/admin/overview") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        adminOverviewRoute(authContext)
       );
     }
 
@@ -130,6 +142,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "GET" && path === "/webhooks") {
       return cognitoProtectedRoute(event, (authContext) =>
         listWebhooksRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/webhook-events") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        listWebhookEventsRoute(event, authContext)
       );
     }
 

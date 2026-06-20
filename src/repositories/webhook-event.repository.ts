@@ -3,6 +3,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -46,6 +47,26 @@ export async function getWebhookEvent(
   );
 
   return (result.Item as WebhookEventRecord | undefined) ?? null;
+}
+
+export async function listWebhookEventsByProject(params: {
+  projectId: string;
+  limit?: number;
+}): Promise<WebhookEventRecord[]> {
+  const result = await dynamoDbClient.send(
+    new QueryCommand({
+      TableName: getWebhookEventsTableName(),
+      IndexName: "projectId-createdAt-index",
+      KeyConditionExpression: "projectId = :projectId",
+      ExpressionAttributeValues: {
+        ":projectId": params.projectId,
+      },
+      ScanIndexForward: false,
+      Limit: params.limit ?? 50,
+    })
+  );
+
+  return (result.Items as WebhookEventRecord[] | undefined) ?? [];
 }
 
 export async function markWebhookEventDelivered(params: {

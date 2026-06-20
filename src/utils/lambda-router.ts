@@ -9,6 +9,7 @@ import {
   internalServerError,
   isHttpError,
 } from "./http-response.js";
+import { logError } from "./structured-log.js";
 
 export function getRoutePath(event: APIGatewayProxyEvent) {
   return event.resource && !event.resource.includes("{")
@@ -17,6 +18,7 @@ export function getRoutePath(event: APIGatewayProxyEvent) {
 }
 
 export async function handleLambdaRoute(
+  event: APIGatewayProxyEvent,
   route: () => Promise<APIGatewayProxyResult> | APIGatewayProxyResult
 ) {
   try {
@@ -26,7 +28,11 @@ export async function handleLambdaRoute(
       return errorResponse(error);
     }
 
-    console.error(error);
+    logError("lambda_unhandled_error", {
+      requestId: event.requestContext.requestId,
+      route: `${event.httpMethod} ${getRoutePath(event)}`,
+      error,
+    });
     return internalServerError();
   }
 }

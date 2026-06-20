@@ -8,10 +8,11 @@ import {
   listWebhookEndpointsByAccount,
   toPublicWebhookEndpoint,
 } from "../repositories/webhook-endpoint.repository.js";
-import { getProjectById } from "../repositories/project.repository.js";
+import { listWebhookEventsByProject } from "../repositories/webhook-event.repository.js";
+import { getProjectById, listProjectsByAccount } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
-import type { WebhookEventType } from "../types/webhook.types.js";
+import type { WebhookEventStatus, WebhookEventType } from "../types/webhook.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
 import { parseJsonObjectBody } from "../utils/request-body.js";
 
@@ -29,6 +30,13 @@ const DEFAULT_EVENTS: WebhookEventType[] = [
   "review.rejected",
 ];
 
+const SUPPORTED_EVENT_STATUSES = new Set<WebhookEventStatus>([
+  "pending",
+  "delivered",
+  "failed",
+  "skipped",
+]);
+
 function parseProjectId(value: unknown) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new HttpError(400, "projectId must be a non-empty string");
@@ -43,6 +51,44 @@ function parseWebhookId(value: unknown) {
   }
 
   return value.trim();
+}
+
+function parseLimit(value: string | undefined) {
+  if (!value) {
+    return 50;
+  }
+
+  const limit = Number(value);
+
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new HttpError(400, "limit must be an integer between 1 and 100");
+  }
+
+  return limit;
+}
+
+function parseOptionalEventType(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!SUPPORTED_EVENTS.has(value as WebhookEventType)) {
+    throw new HttpError(400, "eventType is not supported");
+  }
+
+  return value as WebhookEventType;
+}
+
+function parseOptionalEventStatus(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!SUPPORTED_EVENT_STATUSES.has(value as WebhookEventStatus)) {
+    throw new HttpError(400, "status must be pending, delivered, failed, or skipped");
+  }
+
+  return value as WebhookEventStatus;
 }
 
 function parseUrl(value: unknown) {
@@ -187,4 +233,49 @@ export async function deleteWebhookRoute(
   }
 
   return ok({ webhook: toPublicWebhookEndpoint(webhook) });
+}
+
+export async function listWebhookEventsRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const projectId = event.queryStringParameters?.projectId?.trim();
+  const limit = parseLimit(event.queryStringParameters?.limit);
+  const eventType = parseOptionalEventType(event.queryStringParameters?.eventType);
+  const status = parseOptionalEventStatus(event.queryStringParameters?.status);
+
+  const project = projectId
+    ? await getProjectById({ accountId: account.accountId, projectId })
+    : null;
+  const projects = projectId
+    ? project
+      ? [project]
+      : []
+    : await listProjectsByAccount(account.accountId);
+
+  if (projectId && projects.length === 0) {
+    throw new HttpError(404, "Project not found");
+  }
+
+  const eventsByProject = await Promise.all(
+    projects.map((project) =>
+      listWebhookEventsByProject({
+        projectId: project.projectId,
+        limit,
+      })
+    )
+  );
+  const webhookEvents = eventsByProject
+    .flat()
+    .filter((webhookEvent) => webhookEvent.accountId === account.accountId)
+    .filter((webhookEvent) => (eventType ? webhookEvent.type === eventType : true))
+    .filter((webhookEvent) => (status ? webhookEvent.status === status : true))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+
+  return ok({ events: webhookEvents });
 }

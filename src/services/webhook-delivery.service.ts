@@ -11,6 +11,7 @@ import type {
   WebhookEndpointRecord,
   WebhookEventRecord,
 } from "../types/webhook.types.js";
+import { logError } from "../utils/structured-log.js";
 
 const WEBHOOK_HTTP_TIMEOUT_MS = Number(
   process.env.WEBHOOK_HTTP_TIMEOUT_MS ?? 5000
@@ -96,6 +97,17 @@ export async function deliverWebhookEvent(eventId: string): Promise<void> {
       deliveredAt: new Date().toISOString(),
     });
   } catch (error) {
+    logError("webhook_delivery_failed", {
+      requestId: eventId,
+      route: "SQS webhook delivery",
+      accountId: event.accountId,
+      projectId: event.projectId,
+      eventId,
+      eventType: event.type,
+      endpointCount: endpoints.length,
+      error,
+    });
+
     await recordWebhookEventAttempt({
       eventId,
       status: "failed",

@@ -23,6 +23,7 @@ import {
 import type { AuthContext } from "../types/auth.types.js";
 import type { ModerateImageRequest } from "../types/moderation.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
+import { logError } from "../utils/structured-log.js";
 import { parseMultipartFiles } from "../utils/multipart-form-data.js";
 import {
   assertImageKeyBelongsToProject,
@@ -155,6 +156,23 @@ async function getModerationImageSource(
   return { imageKey: body.imageKey };
 }
 
+function isRekognitionError(error: unknown) {
+  const errorName = error instanceof Error ? error.name : undefined;
+
+  return Boolean(
+    errorName &&
+      [
+        "AccessDeniedException",
+        "InvalidS3ObjectException",
+        "InvalidImageFormatException",
+        "ImageTooLargeException",
+        "ProvisionedThroughputExceededException",
+        "ThrottlingException",
+        "InternalServerError",
+      ].includes(errorName)
+  );
+}
+
 function mapModerationError(error: unknown): never {
   const errorName = error instanceof Error ? error.name : undefined;
 
@@ -210,8 +228,11 @@ export async function moderateRoute(
     throw new Error("IMAGES_BUCKET_NAME is not configured");
   }
 
+  let imageKey: string | undefined;
+
   try {
     const imageSource = await getModerationImageSource(event, authContext);
+    imageKey = imageSource.imageKey;
     const policy =
       (await getPolicyByProjectId(authContext.projectId)) ??
       getDefaultModerationPolicy(authContext.projectId);
@@ -333,6 +354,26 @@ export async function moderateRoute(
 
     return ok(response);
   } catch (error) {
+    if (isRekognitionError(error)) {
+      logError("rekognition_error", {
+        requestId: event.requestContext.requestId,
+        route: "POST /moderate",
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        imageKey,
+        error,
+      });
+    } else if (!(error instanceof HttpError)) {
+      logError("moderation_failure", {
+        requestId: event.requestContext.requestId,
+        route: "POST /moderate",
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        imageKey,
+        error,
+      });
+    }
+
     return mapModerationError(error);
   }
 }

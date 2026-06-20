@@ -8,7 +8,7 @@ import { apiKeyProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/l
 import { corsPreflight, notFound } from "./utils/http-response.js";
 
 export async function handler(event: APIGatewayProxyEvent) {
-  return handleLambdaRoute(async () => {
+  return handleLambdaRoute(event, async () => {
     const method = event.httpMethod;
     const path = getRoutePath(event);
 

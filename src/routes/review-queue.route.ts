@@ -186,7 +186,7 @@ export async function decideReviewQueueRoute(
       status: decision,
       reviewedAt: new Date().toISOString(),
       reviewedBy: authContext.userId,
-      decisionReason,
+      decisionReason: decisionReason ?? "",
     });
     const [reviewWithImageUrl] = await withImageUrls([updatedReview]);
 

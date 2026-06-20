@@ -1,7 +1,8 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTPayload } from "jose";
 
 import type { CognitoAuthContext } from "../types/cognito.types.js";
+import { verifyDashboardJwt } from "../utils/app-jwt.js";
 import { HttpError } from "../utils/http-response.js";
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
@@ -81,6 +82,14 @@ export async function authenticateCognitoJwt(
     throw new HttpError(401, "Invalid authorization token");
   }
 
+  try {
+    if (decodeJwt(token).iss === "visora") {
+      return await verifyDashboardJwt(token);
+    }
+  } catch {
+    throw new HttpError(401, "Invalid authorization token");
+  }
+
   const { clientId, issuer } = getCognitoConfig();
 
   try {
@@ -95,6 +104,10 @@ export async function authenticateCognitoJwt(
       throw error;
     }
 
-    throw new HttpError(401, "Invalid authorization token");
+    try {
+      return await verifyDashboardJwt(token);
+    } catch {
+      throw new HttpError(401, "Invalid authorization token");
+    }
   }
 }

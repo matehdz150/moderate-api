@@ -35,6 +35,7 @@ export async function createAccountForUser(params: {
 export async function ensureAccountForUser(params: {
   userId: string;
   email: string;
+  planId?: PlanId;
 }): Promise<AccountRecord> {
   const accountId = getDashboardAccountId(params.userId);
   const existing = await getAccountById(accountId);
@@ -46,7 +47,7 @@ export async function ensureAccountForUser(params: {
   return createAccountForUser({
     userId: params.userId,
     email: params.email,
-    planId: "free",
+    planId: params.planId ?? "free",
   });
 }
 

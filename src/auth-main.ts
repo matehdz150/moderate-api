@@ -1,6 +1,9 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
+import { authConfirmForgotPasswordRoute } from "./routes/auth-confirm-forgot-password.route.js";
 import { authConfirmRoute } from "./routes/auth-confirm.route.js";
+import { authForgotPasswordRoute } from "./routes/auth-forgot-password.route.js";
+import { authGitHubExchangeRoute } from "./routes/auth-github-exchange.route.js";
 import { authLoginRoute } from "./routes/auth-login.route.js";
 import { authRegisterRoute } from "./routes/auth-register.route.js";
 import { authResendConfirmationRoute } from "./routes/auth-resend-confirmation.route.js";
@@ -31,6 +34,18 @@ export async function handler(event: APIGatewayProxyEvent) {
 
     if (method === "POST" && path === "/auth/login") {
       return authLoginRoute(event);
+    }
+
+    if (method === "POST" && path === "/auth/github/exchange") {
+      return authGitHubExchangeRoute(event);
+    }
+
+    if (method === "POST" && path === "/auth/forgot-password") {
+      return authForgotPasswordRoute(event);
+    }
+
+    if (method === "POST" && path === "/auth/confirm-forgot-password") {
+      return authConfirmForgotPasswordRoute(event);
     }
 
     if (method === "GET" && path === "/health") {

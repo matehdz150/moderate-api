@@ -20,6 +20,8 @@ import {
   deleteWebhookRoute,
   listWebhookEventsRoute,
   listWebhooksRoute,
+  retryWebhookEventRoute,
+  rotateWebhookSecretRoute,
 } from "./routes/webhooks.route.js";
 import {
   createProjectRoute,
@@ -151,6 +153,12 @@ export async function handler(event: APIGatewayProxyEvent) {
       );
     }
 
+    if (method === "POST" && path === "/webhook-events/retry") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        retryWebhookEventRoute(event, authContext)
+      );
+    }
+
     if (method === "POST" && path === "/webhooks") {
       return cognitoProtectedRoute(event, (authContext) =>
         createWebhookRoute(event, authContext)
@@ -160,6 +168,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "DELETE" && path === "/webhooks") {
       return cognitoProtectedRoute(event, (authContext) =>
         deleteWebhookRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/webhooks/rotate-secret") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        rotateWebhookSecretRoute(event, authContext)
       );
     }
 

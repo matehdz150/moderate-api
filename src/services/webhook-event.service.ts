@@ -15,6 +15,19 @@ function isWebhookPublishingConfigured() {
   );
 }
 
+export async function enqueueWebhookEventDelivery(eventId: string): Promise<void> {
+  if (!process.env.WEBHOOK_DELIVERY_QUEUE_URL) {
+    throw new Error("WEBHOOK_DELIVERY_QUEUE_URL is not configured");
+  }
+
+  await sqsClient.send(
+    new SendMessageCommand({
+      QueueUrl: process.env.WEBHOOK_DELIVERY_QUEUE_URL,
+      MessageBody: JSON.stringify({ eventId }),
+    })
+  );
+}
+
 export async function publishWebhookEvent(params: {
   type: WebhookEventType;
   accountId: string;
@@ -40,12 +53,7 @@ export async function publishWebhookEvent(params: {
 
   try {
     await createWebhookEvent(event);
-    await sqsClient.send(
-      new SendMessageCommand({
-        QueueUrl: process.env.WEBHOOK_DELIVERY_QUEUE_URL,
-        MessageBody: JSON.stringify({ eventId: event.eventId }),
-      })
-    );
+    await enqueueWebhookEventDelivery(event.eventId);
   } catch (error) {
     console.error("Failed to publish webhook event", {
       type: params.type,

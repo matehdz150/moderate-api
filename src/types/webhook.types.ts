@@ -14,6 +14,8 @@ export interface WebhookEndpointRecord {
   name?: string;
   url: string;
   secret: string;
+  previousSecret?: string;
+  previousSecretExpiresAt?: string;
   events: WebhookEventType[];
   status: WebhookEndpointStatus;
   createdAt: string;

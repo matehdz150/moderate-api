@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
+  GetCommand,
   PutCommand,
   QueryCommand,
   UpdateCommand,
@@ -27,9 +28,26 @@ function getWebhookEndpointsTableName() {
 export function toPublicWebhookEndpoint(
   endpoint: WebhookEndpointRecord
 ): PublicWebhookEndpoint {
-  const { secret: _secret, ...publicEndpoint } = endpoint;
+  const {
+    secret: _secret,
+    previousSecret: _previousSecret,
+    ...publicEndpoint
+  } = endpoint;
 
   return publicEndpoint;
+}
+
+export async function getWebhookEndpoint(
+  webhookId: string
+): Promise<WebhookEndpointRecord | null> {
+  const result = await dynamoDbClient.send(
+    new GetCommand({
+      TableName: getWebhookEndpointsTableName(),
+      Key: { webhookId },
+    })
+  );
+
+  return (result.Item as WebhookEndpointRecord | undefined) ?? null;
 }
 
 export async function createWebhookEndpoint(
@@ -116,4 +134,33 @@ export async function disableWebhookEndpoint(params: {
   );
 
   return (result.Attributes as WebhookEndpointRecord | undefined) ?? null;
+}
+
+export async function rotateWebhookEndpointSecret(params: {
+  webhookId: string;
+  accountId: string;
+  secret: string;
+  previousSecret: string;
+  previousSecretExpiresAt: string;
+  updatedAt: string;
+}): Promise<WebhookEndpointRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getWebhookEndpointsTableName(),
+      Key: { webhookId: params.webhookId },
+      ConditionExpression: "accountId = :accountId",
+      UpdateExpression:
+        "SET secret = :secret, previousSecret = :previousSecret, previousSecretExpiresAt = :previousSecretExpiresAt, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":accountId": params.accountId,
+        ":secret": params.secret,
+        ":previousSecret": params.previousSecret,
+        ":previousSecretExpiresAt": params.previousSecretExpiresAt,
+        ":updatedAt": params.updatedAt,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as WebhookEndpointRecord;
 }

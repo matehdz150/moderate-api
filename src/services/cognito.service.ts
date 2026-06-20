@@ -1,6 +1,8 @@
 import {
   CognitoIdentityProviderClient,
+  ConfirmForgotPasswordCommand,
   ConfirmSignUpCommand,
+  ForgotPasswordCommand,
   InitiateAuthCommand,
   ResendConfirmationCodeCommand,
   SignUpCommand,
@@ -49,6 +51,43 @@ function mapCognitoAuthError(error: unknown): never {
 
   if (errorName === "UserNotConfirmedException") {
     throw new HttpError(403, "User is not confirmed");
+  }
+
+  throw error;
+}
+
+function mapForgotPasswordError(error: unknown): never {
+  const errorName = error instanceof Error ? error.name : undefined;
+
+  if (errorName === "UserNotFoundException") {
+    throw new HttpError(404, "User not found");
+  }
+
+  if (errorName === "InvalidPasswordException") {
+    throw new HttpError(400, "Password does not meet requirements");
+  }
+
+  if (errorName === "CodeMismatchException") {
+    throw new HttpError(400, "Invalid reset code");
+  }
+
+  if (errorName === "ExpiredCodeException") {
+    throw new HttpError(400, "Reset code has expired");
+  }
+
+  if (errorName === "InvalidParameterException") {
+    throw new HttpError(400, "User cannot reset password");
+  }
+
+  if (
+    errorName === "LimitExceededException" ||
+    errorName === "TooManyRequestsException"
+  ) {
+    throw new HttpError(429, "Too many password reset requests. Try again later");
+  }
+
+  if (errorName === "CodeDeliveryFailureException") {
+    throw new HttpError(502, "Could not send password reset code");
   }
 
   throw error;
@@ -146,6 +185,48 @@ export async function resendUserConfirmationCode(email: string) {
     };
   } catch (error) {
     mapResendConfirmationError(error);
+  }
+}
+
+export async function forgotUserPassword(email: string) {
+  try {
+    await cognitoClient.send(
+      new ForgotPasswordCommand({
+        ClientId: getCognitoClientId(),
+        Username: email,
+      })
+    );
+
+    return {
+      email,
+      codeSent: true,
+    };
+  } catch (error) {
+    mapForgotPasswordError(error);
+  }
+}
+
+export async function confirmUserForgotPassword(params: {
+  email: string;
+  confirmationCode: string;
+  newPassword: string;
+}) {
+  try {
+    await cognitoClient.send(
+      new ConfirmForgotPasswordCommand({
+        ClientId: getCognitoClientId(),
+        Username: params.email,
+        ConfirmationCode: params.confirmationCode,
+        Password: params.newPassword,
+      })
+    );
+
+    return {
+      email: params.email,
+      passwordReset: true,
+    };
+  } catch (error) {
+    mapForgotPasswordError(error);
   }
 }
 

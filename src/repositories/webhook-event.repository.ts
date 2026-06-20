@@ -138,3 +138,28 @@ export async function recordWebhookEventAttempt(params: {
     })
   );
 }
+
+export async function markWebhookEventPending(params: {
+  eventId: string;
+  updatedAt: string;
+}): Promise<WebhookEventRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getWebhookEventsTableName(),
+      Key: { eventId: params.eventId },
+      ConditionExpression: "attribute_exists(eventId)",
+      UpdateExpression:
+        "SET #status = :status, updatedAt = :updatedAt REMOVE lastError, skippedAt, deliveredAt",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":status": "pending",
+        ":updatedAt": params.updatedAt,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as WebhookEventRecord;
+}

@@ -5,12 +5,15 @@ import { ulid } from "ulid";
 import {
   createWebhookEndpoint,
   disableWebhookEndpoint,
+  getWebhookEndpoint,
   listWebhookEndpointsByAccount,
+  rotateWebhookEndpointSecret,
   toPublicWebhookEndpoint,
 } from "../repositories/webhook-endpoint.repository.js";
-import { listWebhookEventsByProject } from "../repositories/webhook-event.repository.js";
+import { getWebhookEvent, listWebhookEventsByProject, markWebhookEventPending } from "../repositories/webhook-event.repository.js";
 import { getProjectById, listProjectsByAccount } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
+import { enqueueWebhookEventDelivery } from "../services/webhook-event.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import type { WebhookEventStatus, WebhookEventType } from "../types/webhook.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
@@ -278,4 +281,75 @@ export async function listWebhookEventsRoute(
     .slice(0, limit);
 
   return ok({ events: webhookEvents });
+}
+
+function parseEventId(value: unknown) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new HttpError(400, "eventId must be a non-empty string");
+  }
+
+  return value.trim();
+}
+
+export async function retryWebhookEventRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const body = parseJsonObjectBody(event.body);
+  const eventId = parseEventId(body.eventId);
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const webhookEvent = await getWebhookEvent(eventId);
+
+  if (!webhookEvent || webhookEvent.accountId !== account.accountId) {
+    throw new HttpError(404, "Webhook event not found");
+  }
+
+  if (webhookEvent.status === "delivered") {
+    throw new HttpError(409, "Delivered webhook events cannot be retried");
+  }
+
+  const updatedEvent = await markWebhookEventPending({
+    eventId,
+    updatedAt: new Date().toISOString(),
+  });
+  await enqueueWebhookEventDelivery(eventId);
+
+  return ok({ event: updatedEvent });
+}
+
+export async function rotateWebhookSecretRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const body = parseJsonObjectBody(event.body);
+  const webhookId = parseWebhookId(body.webhookId);
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+  const webhook = await getWebhookEndpoint(webhookId);
+
+  if (!webhook || webhook.accountId !== account.accountId) {
+    throw new HttpError(404, "Webhook not found");
+  }
+
+  const now = new Date();
+  const secret = createWebhookSecret();
+  const rotatedWebhook = await rotateWebhookEndpointSecret({
+    webhookId,
+    accountId: account.accountId,
+    secret,
+    previousSecret: webhook.secret,
+    previousSecretExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    updatedAt: now.toISOString(),
+  });
+
+  return ok({
+    webhook: toPublicWebhookEndpoint(rotatedWebhook),
+    secret,
+    previousSecretExpiresAt: rotatedWebhook.previousSecretExpiresAt,
+  });
 }

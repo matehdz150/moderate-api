@@ -25,6 +25,22 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface GitHubExchangeRequest {
+  code: string;
+  redirectUri: string;
+  planId: PlanId;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ConfirmForgotPasswordRequest {
+  email: string;
+  confirmationCode: string;
+  newPassword: string;
+}
+
 export interface LoginResponse {
   idToken: string;
   accessToken: string;

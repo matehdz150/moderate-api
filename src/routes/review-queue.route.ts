@@ -9,6 +9,7 @@ import {
 import { getProjectById } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
 import { createImageReadUrl } from "../services/s3.service.js";
+import { publishWebhookEvent } from "../services/webhook-event.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import type {
   ReviewQueueItem,
@@ -188,6 +189,29 @@ export async function decideReviewQueueRoute(
       reviewedBy: authContext.userId,
       decisionReason: decisionReason ?? "",
     });
+    if (decision === "approved" || decision === "rejected") {
+      await publishWebhookEvent({
+        type: decision === "approved" ? "review.approved" : "review.rejected",
+        accountId: updatedReview.accountId,
+        projectId: updatedReview.projectId,
+        payload: {
+          reviewId: updatedReview.reviewId,
+          moderationId: updatedReview.moderationId,
+          imageKey: updatedReview.imageKey,
+          status: updatedReview.status,
+          reviewedAt: updatedReview.reviewedAt,
+          reviewedBy: updatedReview.reviewedBy,
+          decisionReason: updatedReview.decisionReason,
+          riskScore: updatedReview.riskScore,
+          category: updatedReview.category,
+          labels: updatedReview.labels,
+          explanation: updatedReview.explanation,
+          brandSafety: updatedReview.brandSafety,
+          ...(updatedReview.compliance ? { compliance: updatedReview.compliance } : {}),
+        },
+      });
+    }
+
     const [reviewWithImageUrl] = await withImageUrls([updatedReview]);
 
     return ok({ review: reviewWithImageUrl });

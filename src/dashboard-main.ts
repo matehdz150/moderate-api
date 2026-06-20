@@ -14,6 +14,7 @@ import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
 import { decideReviewQueueRoute, listReviewQueueRoute } from "./routes/review-queue.route.js";
+import { createWebhookRoute, deleteWebhookRoute, listWebhooksRoute } from "./routes/webhooks.route.js";
 import {
   createProjectRoute,
   deleteProjectRoute,
@@ -123,6 +124,24 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/dashboard/moderate") {
       return cognitoProtectedRoute(event, (authContext) =>
         dashboardModerateRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/webhooks") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        listWebhooksRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/webhooks") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        createWebhookRoute(event, authContext)
+      );
+    }
+
+    if (method === "DELETE" && path === "/webhooks") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        deleteWebhookRoute(event, authContext)
       );
     }
 

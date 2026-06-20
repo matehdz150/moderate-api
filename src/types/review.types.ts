@@ -3,6 +3,7 @@ import type { ComplianceResult } from "./compliance.types.js";
 import type {
   ModerationCategory,
   ModerationDecisionAction,
+  ModerationDecisionExplanation,
 } from "./policy.types.js";
 import type { ModerationLabel } from "./moderation.types.js";
 
@@ -20,6 +21,7 @@ export interface ReviewQueueRecord {
   category?: ModerationCategory | null;
   action: ModerationDecisionAction;
   labels: ModerationLabel[];
+  explanation?: ModerationDecisionExplanation;
   brandSafety?: BrandSafetyResult;
   compliance?: ComplianceResult | null;
   createdAt: string;

@@ -34,10 +34,21 @@ export interface ModerationPolicy {
   updatedAt?: string;
 }
 
+export interface ModerationDecisionExplanation {
+  message: string;
+  reason: "no_policy_match" | "category_action" | "risk_threshold" | "review_fallback";
+  matchedCategory?: ModerationCategory;
+  matchedLabel?: string;
+  matchedConfidence?: number;
+  configuredAction?: ModerationDecisionAction;
+  threshold?: number;
+}
+
 export interface ModerationDecision {
   safe: boolean;
   action: ModerationDecisionAction;
   riskScore: number;
   category: ModerationCategory | null;
   labels: ModerationLabel[];
+  explanation: ModerationDecisionExplanation;
 }

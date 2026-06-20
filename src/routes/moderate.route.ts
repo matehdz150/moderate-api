@@ -15,6 +15,7 @@ import {
 } from "../services/rekognition.service.js";
 import { uploadImageObject } from "../services/s3.service.js";
 import { getPlanRetentionDays } from "../services/plan.service.js";
+import { publishWebhookEvent } from "../services/webhook-event.service.js";
 import {
   evaluateModerationPolicy,
   getDefaultModerationPolicy,
@@ -250,6 +251,7 @@ export async function moderateRoute(
       riskScore: decision.riskScore,
       category: decision.category,
       labels: decision.labels,
+      explanation: decision.explanation,
       brandSafety,
       ...(compliance ? { compliance } : {}),
     };
@@ -267,14 +269,18 @@ export async function moderateRoute(
       category: response.category,
       policyMode: policy.mode,
       labels: response.labels,
+      explanation: response.explanation,
       brandSafety: response.brandSafety,
       ...(compliance ? { compliance } : {}),
       createdAt,
     });
 
+    let reviewId: string | undefined;
+
     if (response.action === "review") {
+      reviewId = "rev_" + ulid();
       await createReviewQueueItem({
-        reviewId: "rev_" + ulid(),
+        reviewId,
         accountId: authContext.accountId,
         projectId: authContext.projectId,
         planId: authContext.planId,
@@ -285,10 +291,43 @@ export async function moderateRoute(
         category: response.category,
         action: response.action,
         labels: response.labels,
+        explanation: response.explanation,
         brandSafety: response.brandSafety,
         ...(compliance ? { compliance } : {}),
         createdAt,
         updatedAt: createdAt,
+      });
+    }
+
+    await publishWebhookEvent({
+      type: "moderation.completed",
+      accountId: authContext.accountId,
+      projectId: authContext.projectId,
+      payload: {
+        ...response,
+        imageKey: imageSource.imageKey,
+        createdAt,
+      },
+    });
+
+    if (reviewId) {
+      await publishWebhookEvent({
+        type: "moderation.review_required",
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        payload: {
+          reviewId,
+          moderationId: response.moderationId,
+          imageKey: imageSource.imageKey,
+          action: response.action,
+          riskScore: response.riskScore,
+          category: response.category,
+          labels: response.labels,
+          explanation: response.explanation,
+          brandSafety: response.brandSafety,
+          ...(compliance ? { compliance } : {}),
+          createdAt,
+        },
       });
     }
 

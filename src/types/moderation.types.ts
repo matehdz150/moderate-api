@@ -3,6 +3,7 @@ import type { ComplianceResult } from "./compliance.types.js";
 import type {
   ModerationCategory,
   ModerationDecisionAction,
+  ModerationDecisionExplanation,
 } from "./policy.types.js";
 
 export interface ModerateImageRequest {
@@ -24,6 +25,7 @@ export interface ModerationResponse {
   riskScore?: number;
   category?: ModerationCategory | null;
   labels: ModerationLabel[];
+  explanation?: ModerationDecisionExplanation;
   brandSafety?: BrandSafetyResult;
   compliance?: ComplianceResult | null;
 }
@@ -45,6 +47,7 @@ export interface ModerationLogRecord {
   category?: ModerationCategory | null;
   policyMode?: string;
   labels: ModerationLabel[];
+  explanation?: ModerationDecisionExplanation;
   brandSafety?: BrandSafetyResult;
   compliance?: ComplianceResult | null;
   createdAt: string;

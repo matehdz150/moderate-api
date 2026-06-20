@@ -1,6 +1,16 @@
 export type ModerationAction = "allow" | "review" | "reject";
 export type BrandSafetyLevel = "safe" | "caution" | "unsafe";
 
+export interface ModerationDecisionExplanation {
+  message: string;
+  reason: "no_policy_match" | "category_action" | "risk_threshold" | "review_fallback";
+  matchedCategory?: string;
+  matchedLabel?: string;
+  matchedConfidence?: number;
+  configuredAction?: ModerationAction;
+  threshold?: number;
+}
+
 export interface ModerationLabel {
   name: string;
   confidence: number;
@@ -27,6 +37,7 @@ export interface ModerationResponse {
   riskScore?: number;
   category?: string | null;
   labels: ModerationLabel[];
+  explanation?: ModerationDecisionExplanation;
   brandSafety?: BrandSafetyResult;
   compliance?: ComplianceResult | null;
 }

@@ -12,11 +12,13 @@
     "build:dashboard": "esbuild src/dashboard-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/dashboard-main.js",
     "build:moderation": "esbuild src/moderation-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/moderation-main.js",
     "build:client": "pnpm --filter @visoracloud/client build",
-    "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:moderation",
+    "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:moderation && pnpm run build:webhook",
     "build:all": "pnpm run build && pnpm run build:client",
     "typecheck": "tsc --noEmit",
     "typecheck:client": "pnpm --filter @visoracloud/client typecheck",
-    "typecheck:all": "pnpm run typecheck && pnpm run typecheck:client"
+    "typecheck:all": "pnpm run typecheck && pnpm run typecheck:client",
+    "build:webhook": "esbuild src/webhook-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/webhook-main.js",
+    "setup:webhooks": "tsx scripts/setup-webhooks-infra.ts"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +29,7 @@
     "@aws-sdk/client-dynamodb": "^3.1069.0",
     "@aws-sdk/client-rekognition": "^3.1069.0",
     "@aws-sdk/client-s3": "^3.1069.0",
+    "@aws-sdk/client-sqs": "^3.1073.0",
     "@aws-sdk/lib-dynamodb": "^3.1069.0",
     "@aws-sdk/s3-request-presigner": "^3.1069.0",
     "jose": "^6.2.3",

@@ -7,6 +7,7 @@ import type {
   ModerationCategory,
   ModerationDecision,
   ModerationDecisionAction,
+  ModerationDecisionExplanation,
   ModerationMode,
   ModerationPolicy,
 } from "../types/policy.types.js";
@@ -334,6 +335,120 @@ function applyReviewMode(
   return policy.reviewFallbackAction ?? "reject";
 }
 
+function getLabelAction(
+  label: NormalizedLabel,
+  categoryActions: Record<ModerationCategory, ModerationDecisionAction>,
+  policy: ModerationPolicy
+): ModerationDecisionAction {
+  return (
+    categoryActions[label.category] ??
+    getFinalActionFromThresholds(label.confidence, policy)
+  );
+}
+
+function getDecisionLabel(
+  labels: NormalizedLabel[],
+  categoryActions: Record<ModerationCategory, ModerationDecisionAction>,
+  policy: ModerationPolicy,
+  action: ModerationDecisionAction
+) {
+  return labels
+    .filter((label) => getLabelAction(label, categoryActions, policy) === action)
+    .sort((a, b) => b.confidence - a.confidence)[0] ?? null;
+}
+
+function actionText(action: ModerationDecisionAction) {
+  if (action === "reject") return "Rejected";
+  if (action === "review") return "Sent to review";
+  return "Allowed";
+}
+
+function buildDecisionExplanation(params: {
+  labels: NormalizedLabel[];
+  categoryActions: Record<ModerationCategory, ModerationDecisionAction>;
+  policy: ModerationPolicy;
+  rawAction: ModerationDecisionAction;
+  action: ModerationDecisionAction;
+  highestRiskLabel: NormalizedLabel | null;
+}): ModerationDecisionExplanation {
+  const matchedLabel =
+    getDecisionLabel(
+      params.labels,
+      params.categoryActions,
+      params.policy,
+      params.rawAction
+    ) ?? params.highestRiskLabel;
+
+  if (!matchedLabel) {
+    return {
+      message: "Allowed because no configured moderation categories matched this image.",
+      reason: "no_policy_match",
+      configuredAction: "allow",
+    };
+  }
+
+  if (params.rawAction === "review" && params.action !== "review") {
+    return {
+      message:
+        actionText(params.action) +
+        " because " +
+        matchedLabel.category +
+        " matched review action and review mode fallback is " +
+        params.action +
+        ".",
+      reason: "review_fallback",
+      matchedCategory: matchedLabel.category,
+      matchedLabel: matchedLabel.name,
+      matchedConfidence: matchedLabel.confidence,
+      configuredAction: params.action,
+    };
+  }
+
+  const explicitAction = params.policy.categoryActions[matchedLabel.category];
+
+  if (explicitAction) {
+    return {
+      message:
+        actionText(params.action) +
+        " because " +
+        matchedLabel.category +
+        " matched " +
+        explicitAction +
+        " action.",
+      reason: "category_action",
+      matchedCategory: matchedLabel.category,
+      matchedLabel: matchedLabel.name,
+      matchedConfidence: matchedLabel.confidence,
+      configuredAction: explicitAction,
+    };
+  }
+
+  const threshold =
+    params.action === "reject"
+      ? params.policy.rejectThreshold
+      : params.action === "review"
+        ? params.policy.reviewThreshold
+        : params.policy.minConfidence;
+
+  return {
+    message:
+      actionText(params.action) +
+      " because " +
+      matchedLabel.category +
+      " confidence " +
+      matchedLabel.confidence +
+      "% met the " +
+      params.action +
+      " threshold.",
+    reason: "risk_threshold",
+    matchedCategory: matchedLabel.category,
+    matchedLabel: matchedLabel.name,
+    matchedConfidence: matchedLabel.confidence,
+    configuredAction: params.action,
+    threshold,
+  };
+}
+
 export function evaluateModerationPolicy({
   moderationLabels,
   generalLabels = [],
@@ -361,10 +476,16 @@ export function evaluateModerationPolicy({
   const highestRiskLabel =
     labels.find((label) => label.confidence === riskScore) ?? null;
 
-  const action = applyReviewMode(
-    getFinalActionFromLabels(labels, categoryActions, policy),
-    policy
-  );
+  const rawAction = getFinalActionFromLabels(labels, categoryActions, policy);
+  const action = applyReviewMode(rawAction, policy);
+  const explanation = buildDecisionExplanation({
+    labels,
+    categoryActions,
+    policy,
+    rawAction,
+    action,
+    highestRiskLabel,
+  });
 
   return {
     safe: action === "allow",
@@ -372,5 +493,6 @@ export function evaluateModerationPolicy({
     riskScore,
     category: highestRiskLabel?.category ?? null,
     labels,
+    explanation,
   };
 }

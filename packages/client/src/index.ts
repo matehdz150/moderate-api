@@ -14,6 +14,7 @@ export type {
   ModerateImageKeyParams,
   ModerateImageParams,
   ModerationAction,
+  ModerationDecisionExplanation,
   ModerationLabel,
   ModerationLogRecord,
   ModerationLogsResponse,

@@ -13,6 +13,7 @@ jobs:
       AUTH_LAMBDA_FUNCTION_NAME: moderate-api-auth-lambda
       DASHBOARD_LAMBDA_FUNCTION_NAME: moderate-api-dashboard-lambda
       MODERATION_LAMBDA_FUNCTION_NAME: moderate-api-lambda
+      WEBHOOK_LAMBDA_FUNCTION_NAME: moderate-api-webhook-lambda
 
     permissions:
       contents: read
@@ -115,3 +116,25 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name "$MODERATION_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Webhook Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$WEBHOOK_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Webhook Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$WEBHOOK_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Webhook Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$WEBHOOK_LAMBDA_FUNCTION_NAME" \
+            --handler dist/webhook-main.handler
+
+      - name: Wait for Webhook Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$WEBHOOK_LAMBDA_FUNCTION_NAME"

@@ -20,6 +20,7 @@ import { meRoute } from "./routes/me.route.js";
 import { moderateRoute } from "./routes/moderate.route.js";
 import { moderationLogsRoute } from "./routes/moderation-logs.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
+import { decideReviewQueueRoute, listReviewQueueRoute } from "./routes/review-queue.route.js";
 import {
   createProjectRoute,
   deleteProjectRoute,
@@ -173,6 +174,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "PUT" && path === "/policies") {
       return await cognitoProtectedRoute(event, (authContext) =>
         savePolicyRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/review-queue") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        listReviewQueueRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/review-queue/decision") {
+      return await cognitoProtectedRoute(event, (authContext) =>
+        decideReviewQueueRoute(event, authContext)
       );
     }
 

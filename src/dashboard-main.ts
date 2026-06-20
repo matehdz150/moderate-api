@@ -13,6 +13,7 @@ import { dashboardModerateRoute } from "./routes/dashboard-moderate.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { meRoute } from "./routes/me.route.js";
 import { savePolicyRoute } from "./routes/policies.route.js";
+import { decideReviewQueueRoute, listReviewQueueRoute } from "./routes/review-queue.route.js";
 import {
   createProjectRoute,
   deleteProjectRoute,
@@ -104,6 +105,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "PUT" && path === "/policies") {
       return cognitoProtectedRoute(event, (authContext) =>
         savePolicyRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/review-queue") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        listReviewQueueRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/review-queue/decision") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        decideReviewQueueRoute(event, authContext)
       );
     }
 

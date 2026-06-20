@@ -3,6 +3,7 @@ import { ulid } from "ulid";
 
 import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { saveModerationLog } from "../repositories/moderation-log.repository.js";
+import { createReviewQueueItem } from "../repositories/review-queue.repository.js";
 import { evaluateBrandSafety } from "../services/brand-safety.service.js";
 import {
   evaluateCompliancePack,
@@ -252,6 +253,7 @@ export async function moderateRoute(
       brandSafety,
       ...(compliance ? { compliance } : {}),
     };
+    const createdAt = new Date().toISOString();
 
     await saveModerationLog({
       moderationId: response.moderationId,
@@ -267,8 +269,28 @@ export async function moderateRoute(
       labels: response.labels,
       brandSafety: response.brandSafety,
       ...(compliance ? { compliance } : {}),
-      createdAt: new Date().toISOString(),
+      createdAt,
     });
+
+    if (response.action === "review") {
+      await createReviewQueueItem({
+        reviewId: "rev_" + ulid(),
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        planId: authContext.planId,
+        moderationId: response.moderationId,
+        imageKey: imageSource.imageKey,
+        status: "pending",
+        riskScore: response.riskScore,
+        category: response.category,
+        action: response.action,
+        labels: response.labels,
+        brandSafety: response.brandSafety,
+        ...(compliance ? { compliance } : {}),
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
 
     return ok(response);
   } catch (error) {

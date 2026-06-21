@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
+import { deleteAccountRoute } from "./routes/account-delete.route.js";
 import { updateAccountPlanRoute } from "./routes/account-plan.route.js";
 import { adminOverviewRoute } from "./routes/admin-overview.route.js";
 import {
@@ -60,6 +61,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "PUT" && path === "/account/plan") {
       return cognitoProtectedRoute(event, (authContext) =>
         updateAccountPlanRoute(event, authContext)
+      );
+    }
+
+    if (method === "DELETE" && path === "/account") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        deleteAccountRoute(authContext)
       );
     }
 

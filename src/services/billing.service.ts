@@ -157,6 +157,84 @@ async function ensureStripeCustomer(account: AccountRecord) {
   return customer.id;
 }
 
+function getInvoicePaymentClientSecret(invoice: Stripe.Invoice | null) {
+  if (!invoice) {
+    return undefined;
+  }
+
+  if (typeof invoice.confirmation_secret?.client_secret === "string") {
+    return invoice.confirmation_secret.client_secret;
+  }
+
+  const invoiceWithPaymentIntent = invoice as Stripe.Invoice & {
+    payment_intent?: string | Stripe.PaymentIntent | null;
+  };
+  const paymentIntent = invoiceWithPaymentIntent.payment_intent;
+
+  if (paymentIntent && typeof paymentIntent === "object" && typeof paymentIntent.client_secret === "string") {
+    return paymentIntent.client_secret;
+  }
+
+  return undefined;
+}
+
+async function getSubscriptionPaymentClientSecret(subscription: Stripe.Subscription) {
+  const latestInvoice = subscription.latest_invoice;
+
+  if (!latestInvoice) {
+    return undefined;
+  }
+
+  if (typeof latestInvoice === "object") {
+    const expandedSecret = getInvoicePaymentClientSecret(latestInvoice);
+
+    if (expandedSecret) {
+      return expandedSecret;
+    }
+
+    if (!latestInvoice.id) {
+      return undefined;
+    }
+
+    const invoice = await getStripe().invoices.retrieve(latestInvoice.id, {
+      expand: ["payment_intent"],
+    });
+
+    return getInvoicePaymentClientSecret(invoice);
+  }
+
+  const invoice = await getStripe().invoices.retrieve(latestInvoice, {
+    expand: ["payment_intent"],
+  });
+
+  return getInvoicePaymentClientSecret(invoice);
+}
+
+async function cancelIncompleteSubscriptionsForPrice(customerId: string, priceId: string) {
+  const existingSubscriptions = await getStripe().subscriptions.list({
+    customer: customerId,
+    status: "incomplete",
+    limit: 10,
+  });
+
+  await Promise.all(
+    existingSubscriptions.data
+      .filter((subscription) => subscription.items.data.some((item) => item.price.id === priceId))
+      .map(async (subscription) => {
+        try {
+          await getStripe().subscriptions.cancel(subscription.id);
+        } catch (error) {
+          console.warn(JSON.stringify({
+            level: "warn",
+            message: "Failed to cancel stale incomplete Stripe subscription",
+            subscriptionId: subscription.id,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
+      })
+  );
+}
+
 export async function createSubscriptionIntent(params: {
   authContext: CognitoAuthContext;
   planId: PaidPlanId;
@@ -177,16 +255,10 @@ export async function createSubscriptionIntent(params: {
   }
 
   const customerId = await ensureStripeCustomer(account);
-  const existingSubscriptions = await getStripe().subscriptions.list({
-    customer: customerId,
-    status: "incomplete",
-    limit: 10,
-    expand: ["data.latest_invoice.payment_intent"],
-  });
-  const reusableSubscription = existingSubscriptions.data.find((subscription) =>
-    subscription.items.data.some((item) => item.price.id === priceId)
-  );
-  const subscription = reusableSubscription ?? await getStripe().subscriptions.create({
+
+  await cancelIncompleteSubscriptionsForPrice(customerId, priceId);
+
+  const subscription = await getStripe().subscriptions.create({
     customer: customerId,
     items: [{ price: priceId }],
     payment_behavior: "default_incomplete",
@@ -199,13 +271,7 @@ export async function createSubscriptionIntent(params: {
     },
     expand: ["latest_invoice.payment_intent"],
   });
-  const invoice = typeof subscription.latest_invoice === "object" ? subscription.latest_invoice : null;
-  const paymentIntent = invoice && typeof (invoice as any).payment_intent === "object"
-    ? (invoice as any).payment_intent
-    : null;
-  const clientSecret = typeof paymentIntent?.client_secret === "string"
-    ? paymentIntent.client_secret
-    : undefined;
+  const clientSecret = await getSubscriptionPaymentClientSecret(subscription);
 
   if (!clientSecret) {
     throw new HttpError(502, "Stripe did not return a payment client secret");

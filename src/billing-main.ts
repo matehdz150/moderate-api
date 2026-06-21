@@ -3,7 +3,9 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import {
   createCheckoutSessionRoute,
   createPortalSessionRoute,
+  createSubscriptionIntentRoute,
   stripeWebhookRoute,
+  syncBillingRoute,
 } from "./routes/billing.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { corsPreflight, notFound } from "./utils/http-response.js";
@@ -22,6 +24,12 @@ export async function handler(event: APIGatewayProxyEvent) {
       return healthRoute();
     }
 
+    if (method === "POST" && (path === "/billing/subscription-intent" || path === "/billing/subscription-intent/")) {
+      return cognitoProtectedRoute(event, (authContext) =>
+        createSubscriptionIntentRoute(event, authContext)
+      );
+    }
+
     if (method === "POST" && path === "/billing/checkout-session") {
       return cognitoProtectedRoute(event, (authContext) =>
         createCheckoutSessionRoute(event, authContext)
@@ -31,6 +39,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/billing/portal-session") {
       return cognitoProtectedRoute(event, (authContext) =>
         createPortalSessionRoute(authContext)
+      );
+    }
+
+    if (method === "POST" && (path === "/billing/sync" || path === "/billing/sync/")) {
+      return cognitoProtectedRoute(event, (authContext) =>
+        syncBillingRoute(authContext)
       );
     }
 

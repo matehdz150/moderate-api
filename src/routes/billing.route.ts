@@ -3,8 +3,10 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import {
   createCheckoutSession,
   createPortalSession,
+  createSubscriptionIntent,
   parseCheckoutPlanId,
   processStripeWebhook,
+  syncBillingAccount,
 } from "../services/billing.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import { badRequest, ok, HttpError } from "../utils/http-response.js";
@@ -33,6 +35,17 @@ function getRawBody(event: APIGatewayProxyEvent) {
     : event.body;
 }
 
+export async function createSubscriptionIntentRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const body = parseJsonObjectBody(event.body);
+  const planId = parseCheckoutPlanId(body.planId);
+  const intent = await createSubscriptionIntent({ authContext, planId });
+
+  return ok(intent);
+}
+
 export async function createCheckoutSessionRoute(
   event: APIGatewayProxyEvent,
   authContext: CognitoAuthContext
@@ -50,6 +63,27 @@ export async function createPortalSessionRoute(
   const session = await createPortalSession(authContext);
 
   return ok(session);
+}
+
+export async function syncBillingRoute(authContext: CognitoAuthContext) {
+  const account = await syncBillingAccount(authContext);
+
+  return ok({
+    account: {
+      accountId: account.accountId,
+      email: account.email,
+      userId: account.userId,
+      planId: account.planId,
+      monthlyLimit: account.monthlyLimit,
+      projectLimit: account.projectLimit,
+      apiKeyLimit: account.apiKeyLimit,
+      logRetentionDays: account.logRetentionDays,
+      stripeCustomerId: account.stripeCustomerId,
+      stripeSubscriptionId: account.stripeSubscriptionId,
+      stripeSubscriptionStatus: account.stripeSubscriptionStatus,
+      stripeCurrentPeriodEnd: account.stripeCurrentPeriodEnd,
+    },
+  });
 }
 
 export async function stripeWebhookRoute(event: APIGatewayProxyEvent) {

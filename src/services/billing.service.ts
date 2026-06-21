@@ -10,7 +10,6 @@ import { markBillingEventProcessed } from "../repositories/billing-event.reposit
 import type { AccountRecord, PlanId } from "../types/account.types.js";
 import type { PaidPlanId } from "../types/billing.types.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
-import { getDashboardAccountId } from "../utils/dashboard-account.js";
 import { HttpError } from "../utils/http-response.js";
 import { changeAccountPlan, ensureAccountForUser } from "./account.service.js";
 import { isPlanId } from "./plan.service.js";
@@ -102,15 +101,77 @@ async function ensureStripeCustomer(account: AccountRecord) {
   return customer.id;
 }
 
-export async function createCheckoutSession(params: {
+export async function createSubscriptionIntent(params: {
   authContext: CognitoAuthContext;
   planId: PaidPlanId;
 }) {
-  const accountId = getDashboardAccountId(params.authContext.userId);
   const account = await ensureAccountForUser({
     userId: params.authContext.userId,
     email: params.authContext.email,
   });
+  const accountId = account.accountId;
+  const priceId = getStripePriceIdForPlan(params.planId);
+
+  if (!priceId) {
+    throw new HttpError(500, "Stripe price is not configured for this plan");
+  }
+
+  if (account.stripeSubscriptionId && ["active", "trialing", "past_due"].includes(account.stripeSubscriptionStatus ?? "")) {
+    throw new HttpError(400, "Use the billing portal to change an active subscription");
+  }
+
+  const customerId = await ensureStripeCustomer(account);
+  const existingSubscriptions = await getStripe().subscriptions.list({
+    customer: customerId,
+    status: "incomplete",
+    limit: 10,
+    expand: ["data.latest_invoice.payment_intent"],
+  });
+  const reusableSubscription = existingSubscriptions.data.find((subscription) =>
+    subscription.items.data.some((item) => item.price.id === priceId)
+  );
+  const subscription = reusableSubscription ?? await getStripe().subscriptions.create({
+    customer: customerId,
+    items: [{ price: priceId }],
+    payment_behavior: "default_incomplete",
+    payment_settings: {
+      save_default_payment_method: "on_subscription",
+    },
+    metadata: {
+      accountId,
+      planId: params.planId,
+    },
+    expand: ["latest_invoice.payment_intent"],
+  });
+  const invoice = typeof subscription.latest_invoice === "object" ? subscription.latest_invoice : null;
+  const paymentIntent = invoice && typeof (invoice as any).payment_intent === "object"
+    ? (invoice as any).payment_intent
+    : null;
+  const clientSecret = typeof paymentIntent?.client_secret === "string"
+    ? paymentIntent.client_secret
+    : undefined;
+
+  if (!clientSecret) {
+    throw new HttpError(502, "Stripe did not return a payment client secret");
+  }
+
+  return {
+    clientSecret,
+    subscriptionId: subscription.id,
+    customerId,
+    planId: params.planId,
+  };
+}
+
+export async function createCheckoutSession(params: {
+  authContext: CognitoAuthContext;
+  planId: PaidPlanId;
+}) {
+  const account = await ensureAccountForUser({
+    userId: params.authContext.userId,
+    email: params.authContext.email,
+  });
+  const accountId = account.accountId;
   const priceId = getStripePriceIdForPlan(params.planId);
 
   if (!priceId) {
@@ -153,8 +214,10 @@ export async function createCheckoutSession(params: {
 }
 
 export async function createPortalSession(authContext: CognitoAuthContext) {
-  const accountId = getDashboardAccountId(authContext.userId);
-  const account = await getAccountById(accountId);
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
 
   if (!account?.stripeCustomerId) {
     throw new HttpError(400, "No billing customer exists for this account");
@@ -227,6 +290,43 @@ async function updateAccountFromSubscription(subscription: Stripe.Subscription) 
       monthlyLimit: updatedAccount.monthlyLimit,
     }),
   ]);
+}
+
+export async function syncBillingAccount(authContext: CognitoAuthContext) {
+  const account = await ensureAccountForUser({
+    userId: authContext.userId,
+    email: authContext.email,
+  });
+
+  if (!account.stripeCustomerId) {
+    return account;
+  }
+
+  const subscriptions = await getStripe().subscriptions.list({
+    customer: account.stripeCustomerId,
+    status: "all",
+    limit: 10,
+  });
+  const subscription = subscriptions.data
+    .filter((item) => !["canceled", "incomplete_expired"].includes(item.status))
+    .sort((a, b) => b.created - a.created)[0];
+
+  if (!subscription) {
+    if (account.planId !== "free" || account.stripeSubscriptionStatus) {
+      return changeAccountPlan({
+        accountId: account.accountId,
+        planId: "free",
+        stripeCustomerId: account.stripeCustomerId,
+        stripeSubscriptionStatus: "none",
+      });
+    }
+
+    return account;
+  }
+
+  await updateAccountFromSubscription(subscription);
+
+  return (await getAccountById(account.accountId)) ?? account;
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {

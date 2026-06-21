@@ -8,6 +8,7 @@ const DEFAULT_LOG_GROUPS = [
   "/aws/lambda/moderate-api-dashboard-lambda",
   "/aws/lambda/moderate-api-lambda",
   "/aws/lambda/moderate-api-webhook-lambda",
+  "/aws/lambda/moderate-api-redaction-lambda",
 ];
 
 interface FilterLogEventsResponse {

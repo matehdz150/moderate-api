@@ -29,6 +29,7 @@ import {
   deleteProjectRoute,
   listProjectsRoute,
   renameProjectRoute,
+  updateProjectRedactionSettingsRoute,
 } from "./routes/projects.route.js";
 import { cognitoProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
 import { corsPreflight, notFound } from "./utils/http-response.js";
@@ -91,6 +92,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "DELETE" && path === "/projects") {
       return cognitoProtectedRoute(event, (authContext) =>
         deleteProjectRoute(event, authContext)
+      );
+    }
+
+    if (method === "PUT" && path === "/projects/redaction-settings") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        updateProjectRedactionSettingsRoute(event, authContext)
       );
     }
 

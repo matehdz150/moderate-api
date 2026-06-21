@@ -16,6 +16,12 @@ function buildTagging(tags: S3RetentionTags) {
   }).toString();
 }
 
+function copyToStandardBuffer(buffer: Buffer) {
+  const output = Buffer.alloc(buffer.length);
+  buffer.copy(output);
+  return output;
+}
+
 export async function createUploadUrl(
   bucketName: string,
   imageKey: string,
@@ -57,7 +63,27 @@ export async function uploadImageObject(params: {
       Key: params.imageKey,
       ContentType: params.contentType,
       Tagging: buildTagging(params.retentionTags),
-      Body: params.body,
+      Body: copyToStandardBuffer(params.body),
     })
   );
+}
+
+export async function downloadImageObject(params: {
+  bucketName: string;
+  imageKey: string;
+}): Promise<Buffer> {
+  const result = await s3Client.send(
+    new GetObjectCommand({
+      Bucket: params.bucketName,
+      Key: params.imageKey,
+    })
+  );
+
+  const body = result.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
+
+  if (!body?.transformToByteArray) {
+    throw new Error("S3 object body is not readable");
+  }
+
+  return Buffer.from(await body.transformToByteArray());
 }

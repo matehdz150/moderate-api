@@ -33,7 +33,11 @@ function optionalEnv(name: string) {
   return process.env[name];
 }
 
-function isActiveStripeSubscription(account: AccountRecord) {
+function hasPaidActiveStripeSubscription(account: AccountRecord) {
+  if (account.planId === "free") {
+    return false;
+  }
+
   return Boolean(
     account.stripeSubscriptionId &&
       account.stripeSubscriptionStatus &&
@@ -193,7 +197,7 @@ export async function deleteAccountData(params: {
     throw new HttpError(403, "You do not have access to this account");
   }
 
-  if (isActiveStripeSubscription(account)) {
+  if (hasPaidActiveStripeSubscription(account)) {
     throw new HttpError(409, "Cancel your active subscription before deleting this account");
   }
 

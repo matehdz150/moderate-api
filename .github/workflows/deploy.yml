@@ -15,6 +15,7 @@ jobs:
       BILLING_LAMBDA_FUNCTION_NAME: moderate-api-billing-lambda
       MODERATION_LAMBDA_FUNCTION_NAME: moderate-api-lambda
       WEBHOOK_LAMBDA_FUNCTION_NAME: moderate-api-webhook-lambda
+      REDACTION_LAMBDA_FUNCTION_NAME: moderate-api-redaction-lambda
 
     permissions:
       contents: read
@@ -161,3 +162,25 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name "$WEBHOOK_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Redaction Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$REDACTION_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Redaction Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$REDACTION_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Redaction Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$REDACTION_LAMBDA_FUNCTION_NAME" \
+            --handler dist/redaction-main.handler
+
+      - name: Wait for Redaction Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$REDACTION_LAMBDA_FUNCTION_NAME"

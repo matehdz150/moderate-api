@@ -13,7 +13,7 @@
     "build:billing": "esbuild src/billing-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/billing-main.js",
     "build:moderation": "esbuild src/moderation-main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/moderation-main.js",
     "build:client": "pnpm --filter @visoracloud/client build",
-    "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:billing && pnpm run build:moderation && pnpm run build:webhook",
+    "build": "rm -rf dist && pnpm run build:auth && pnpm run build:dashboard && pnpm run build:billing && pnpm run build:moderation && pnpm run build:webhook && pnpm run build:redaction",
     "build:all": "pnpm run build && pnpm run build:client",
     "typecheck": "tsc --noEmit",
     "typecheck:client": "pnpm --filter @visoracloud/client typecheck",
@@ -22,7 +22,8 @@
     "setup:webhooks": "tsx scripts/setup-webhooks-infra.ts",
     "setup:account-identities": "tsx scripts/setup-account-identities-infra.ts",
     "setup:billing": "tsx scripts/setup-billing-infra.ts",
-    "setup:observability": "bash scripts/setup-cloudwatch-observability.sh"
+    "setup:observability": "bash scripts/setup-cloudwatch-observability.sh",
+    "build:redaction": "esbuild src/redaction-main.ts --bundle --platform=node --target=node20 --format=cjs --external:sharp --outfile=dist/redaction-main.js"
   },
   "keywords": [],
   "author": "",
@@ -37,6 +38,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1069.0",
     "@aws-sdk/s3-request-presigner": "^3.1069.0",
     "jose": "^6.2.3",
+    "sharp": "^0.35.2",
     "stripe": "^22.2.2",
     "ulid": "^3.0.2"
   },

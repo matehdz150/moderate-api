@@ -10,6 +10,7 @@ AUTH_LAMBDA_FUNCTION_NAME="${AUTH_LAMBDA_FUNCTION_NAME:-moderate-api-auth-lambda
 DASHBOARD_LAMBDA_FUNCTION_NAME="${DASHBOARD_LAMBDA_FUNCTION_NAME:-moderate-api-dashboard-lambda}"
 MODERATION_LAMBDA_FUNCTION_NAME="${MODERATION_LAMBDA_FUNCTION_NAME:-moderate-api-lambda}"
 WEBHOOK_LAMBDA_FUNCTION_NAME="${WEBHOOK_LAMBDA_FUNCTION_NAME:-moderate-api-webhook-lambda}"
+REDACTION_LAMBDA_FUNCTION_NAME="${REDACTION_LAMBDA_FUNCTION_NAME:-moderate-api-redaction-lambda}"
 
 WEBHOOK_DELIVERY_QUEUE_NAME="${WEBHOOK_DELIVERY_QUEUE_NAME:-moderateapi-webhook-delivery}"
 WEBHOOK_DELIVERY_DLQ_NAME="${WEBHOOK_DELIVERY_DLQ_NAME:-moderateapi-webhook-delivery-dlq}"
@@ -294,7 +295,7 @@ put_dashboard() {
       "properties": {
         "region": "${REGION}",
         "title": "Recent Lambda errors",
-        "query": "SOURCE '/aws/lambda/${AUTH_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${DASHBOARD_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${MODERATION_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${WEBHOOK_LAMBDA_FUNCTION_NAME}' | fields @timestamp, @log, @message | filter @message like /ERROR|Error|AccessDenied|Task timed out|Runtime.ExitError/ | sort @timestamp desc | limit 50",
+        "query": "SOURCE '/aws/lambda/${AUTH_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${DASHBOARD_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${MODERATION_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${WEBHOOK_LAMBDA_FUNCTION_NAME}' | SOURCE '/aws/lambda/${REDACTION_LAMBDA_FUNCTION_NAME}' | fields @timestamp, @log, @message | filter @message like /ERROR|Error|AccessDenied|Task timed out|Runtime.ExitError/ | sort @timestamp desc | limit 50",
         "view": "table"
       }
     }
@@ -316,7 +317,8 @@ main() {
     "$AUTH_LAMBDA_FUNCTION_NAME" \
     "$DASHBOARD_LAMBDA_FUNCTION_NAME" \
     "$MODERATION_LAMBDA_FUNCTION_NAME" \
-    "$WEBHOOK_LAMBDA_FUNCTION_NAME"
+    "$WEBHOOK_LAMBDA_FUNCTION_NAME" \
+    "$REDACTION_LAMBDA_FUNCTION_NAME"
   do
     put_log_retention "$function_name"
     put_lambda_error_alarm "$function_name"

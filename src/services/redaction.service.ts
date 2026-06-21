@@ -104,6 +104,11 @@ const ID_DOCUMENT_LABEL_TERMS = [
   "pais",
 ];
 
+interface TextRedactionContext {
+  lineById: Map<number, TextDetection>;
+  idLabelLines: TextDetection[];
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -215,11 +220,105 @@ function isIdDocumentLabel(value: string) {
   return ID_DOCUMENT_LABEL_TERMS.some((term) => containsTerm(value, term));
 }
 
+function getTextBox(text: TextDetection) {
+  const box = text.Geometry?.BoundingBox;
+
+  if (!box || box.Left == null || box.Top == null || box.Width == null || box.Height == null) {
+    return null;
+  }
+
+  return {
+    left: box.Left,
+    top: box.Top,
+    right: box.Left + box.Width,
+    bottom: box.Top + box.Height,
+    width: box.Width,
+    height: box.Height,
+  };
+}
+
+function buildTextRedactionContext(textDetections: TextDetection[]): TextRedactionContext {
+  const lineById = new Map<number, TextDetection>();
+  const idLabelLines: TextDetection[] = [];
+
+  for (const text of textDetections) {
+    if (text.Type !== "LINE" || text.Id == null) continue;
+
+    lineById.set(text.Id, text);
+
+    if (isIdDocumentLabel(text.DetectedText ?? "")) {
+      idLabelLines.push(text);
+    }
+  }
+
+  return { lineById, idLabelLines };
+}
+
+function looksLikeSensitiveIdValue(value: string) {
+  const trimmed = value.trim();
+  const normalized = trimmed.replace(/\s+/g, " ");
+  const compact = normalized.replace(/[^a-zA-Z0-9]/g, "");
+  const letters = (compact.match(/[a-zA-Z]/g) ?? []).length;
+  const digits = (compact.match(/[0-9]/g) ?? []).length;
+
+  if (!normalized) return false;
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized)) return true;
+  if (/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(normalized)) return true;
+  if (/\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b/.test(normalized)) return true;
+  if (digits >= 5) return true;
+  if (letters >= 3 && digits >= 2 && compact.length >= 6) return true;
+  if (/^[A-Z]{4}\d{6}[A-Z0-9]{6,8}$/i.test(compact)) return true;
+
+  return false;
+}
+
+function hasSensitiveParentLine(text: TextDetection, context: TextRedactionContext) {
+  if (text.ParentId == null) return false;
+
+  const parentLine = context.lineById.get(text.ParentId);
+  const parentText = parentLine?.DetectedText ?? "";
+
+  return isIdDocumentLabel(parentText) && !isIdDocumentLabel(text.DetectedText ?? "");
+}
+
+function hasNearbySensitiveLabel(text: TextDetection, context: TextRedactionContext) {
+  const textBox = getTextBox(text);
+
+  if (!textBox) return false;
+
+  return context.idLabelLines.some((line) => {
+    const labelBox = getTextBox(line);
+
+    if (!labelBox) return false;
+
+    const verticallyNearBelow = textBox.top >= labelBox.top && textBox.top - labelBox.bottom <= 0.075;
+    const horizontallyRelated =
+      textBox.left >= labelBox.left - 0.04 && textBox.left <= labelBox.right + 0.32;
+
+    return verticallyNearBelow && horizontallyRelated;
+  });
+}
+
+function isSensitiveIdDocumentValue(text: TextDetection, context: TextRedactionContext) {
+  const value = text.DetectedText?.trim() ?? "";
+
+  if (!value || isIdDocumentLabel(value)) return false;
+  if (looksLikeSensitiveIdValue(value)) return true;
+  if (hasSensitiveParentLine(text, context)) return true;
+  if (hasNearbySensitiveLabel(text, context)) return true;
+
+  return false;
+}
+
 function shouldUseWordLevelTextRedaction(settings: RedactionSettings) {
   return settings.textBlur && (isIdDocumentMode(settings) || settings.ignoredWords.length > 0);
 }
 
-function shouldSkipTextDetection(text: TextDetection, settings: RedactionSettings) {
+function shouldSkipTextDetection(
+  text: TextDetection,
+  settings: RedactionSettings,
+  context: TextRedactionContext
+) {
   const detectedText = text.DetectedText?.trim() ?? "";
 
   if (!detectedText) return true;
@@ -238,6 +337,10 @@ function shouldSkipTextDetection(text: TextDetection, settings: RedactionSetting
 
   if (isIdDocumentMode(settings) && text.Type === "WORD" && isIdDocumentLabel(detectedText)) {
     return true;
+  }
+
+  if (isIdDocumentMode(settings) && text.Type === "WORD") {
+    return !isSensitiveIdDocumentValue(text, context);
   }
 
   return false;
@@ -302,6 +405,7 @@ export async function redactImage(params: {
   const redactedFaces: RedactionFace[] = [];
   const regions: RedactionRegion[] = [];
   const redactedTextRegionKeys = new Set<string>();
+  const textContext = buildTextRedactionContext(textDetections);
 
   for (const face of faces.filter((item) => (item.Confidence ?? 0) >= settings.minConfidence)) {
     const region = getFaceRegion(face, imageWidth, imageHeight);
@@ -353,7 +457,7 @@ export async function redactImage(params: {
       continue;
     }
 
-    if (!isPlate && shouldSkipTextDetection(text, settings)) {
+    if (!isPlate && shouldSkipTextDetection(text, settings, textContext)) {
       continue;
     }
 

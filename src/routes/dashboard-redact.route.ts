@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
-import { getCurrentMonthUsage, incrementUsage } from "../auth/usage.repository.js";
+import { getCurrentMonthUsage, incrementProjectUsage, incrementUsage } from "../auth/usage.repository.js";
 import { getProjectById } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
 import { getPlanOverageConfig } from "../services/plan.service.js";
@@ -63,14 +63,21 @@ export async function dashboardRedactRoute(
   const response = await redactRoute(event, authContext);
 
   if (response.statusCode < 400) {
-    await incrementUsage({
-      accountId: authContext.accountId,
-      projectId: authContext.projectId,
-      planId: authContext.planId,
-      monthlyLimit: authContext.monthlyLimit,
-      overageEnabled: authContext.overageEnabled,
-      overagePriceCentsPerThousand: authContext.overagePriceCentsPerThousand,
-    });
+    await Promise.all([
+      incrementUsage({
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        planId: authContext.planId,
+        monthlyLimit: authContext.monthlyLimit,
+        overageEnabled: authContext.overageEnabled,
+        overagePriceCentsPerThousand: authContext.overagePriceCentsPerThousand,
+      }),
+      incrementProjectUsage({
+        accountId: authContext.accountId,
+        projectId: authContext.projectId,
+        planId: authContext.planId,
+      }),
+    ]);
   }
 
   return response;

@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import { getApiKeyByHash, updateLastUsedAt } from "./api-key.repository.js";
-import { getCurrentMonthUsage, incrementUsage } from "./usage.repository.js";
+import { getCurrentMonthUsage, incrementProjectUsage, incrementUsage } from "./usage.repository.js";
 import type { ApiKeyRecord, AuthContext } from "../types/auth.types.js";
 import { getPlanOverageConfig } from "../services/plan.service.js";
 import { hashApiKey } from "../utils/crypto.js";
@@ -82,6 +82,11 @@ export async function recordUsage(authContext: AuthContext): Promise<void> {
       overageEnabled: authContext.overageEnabled,
       overagePriceCentsPerThousand:
         authContext.overagePriceCentsPerThousand,
+    }),
+    incrementProjectUsage({
+      accountId: authContext.accountId,
+      projectId: authContext.projectId,
+      planId: authContext.planId,
     }),
     updateLastUsedAt(authContext.apiKeyHash),
   ]);

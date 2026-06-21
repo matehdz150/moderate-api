@@ -1,5 +1,5 @@
 import { listApiKeysByAccount } from "../auth/api-key.repository.js";
-import { getCurrentMonthUsage } from "../auth/usage.repository.js";
+import { getCurrentMonthProjectUsage, getCurrentMonthUsage } from "../auth/usage.repository.js";
 import {
   countModerationLogsByProjectSince,
   listModerationLogsByProject,
@@ -50,13 +50,27 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
     )
   );
   const monthlyCounts = await Promise.all(
-    projects.map(async (project) => ({
-      projectId: project.projectId,
-      monthModerations: await countModerationLogsByProjectSince(
-        project.projectId,
-        monthStart
-      ),
-    }))
+    projects.map(async (project) => {
+      if (project.projectType === "redaction") {
+        const projectUsage = await getCurrentMonthProjectUsage({
+          accountId,
+          projectId: project.projectId,
+        });
+
+        return {
+          projectId: project.projectId,
+          monthModerations: projectUsage?.requestsUsed ?? 0,
+        };
+      }
+
+      return {
+        projectId: project.projectId,
+        monthModerations: await countModerationLogsByProjectSince(
+          project.projectId,
+          monthStart
+        ),
+      };
+    })
   );
   const logsByProject = await Promise.all(
     projects.map((project) => listModerationLogsByProject(project.projectId, 10))

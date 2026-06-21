@@ -1,9 +1,15 @@
 export type ProjectType = "moderation" | "redaction";
+export type RedactionStyle = "blur" | "black_box";
+export type RedactionTextCategory = "sexual" | "profanity" | "credentials" | "id_document";
 
 export interface RedactionSettings {
   faceBlur: boolean;
   textBlur: boolean;
   licensePlateBlur: boolean;
+  redactionStyle: RedactionStyle;
+  textCategories: RedactionTextCategory[];
+  customWords: string[];
+  ignoredWords: string[];
   minConfidence: number;
 }
 

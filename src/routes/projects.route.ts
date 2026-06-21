@@ -11,7 +11,11 @@ import {
 import { ensureAccountForUser } from "../services/account.service.js";
 import { createProject } from "../services/project.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
-import type { RedactionSettings } from "../types/project.types.js";
+import type {
+  RedactionSettings,
+  RedactionStyle,
+  RedactionTextCategory,
+} from "../types/project.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
 import { parseJsonObjectBody } from "../utils/request-body.js";
 import { getDashboardAccountId } from "../utils/dashboard-account.js";
@@ -50,6 +54,88 @@ function parseBooleanSetting(
   return settings[key];
 }
 
+function parseRedactionStyle(settings: Record<string, unknown>) {
+  if (settings.redactionStyle === undefined) return undefined;
+
+  if (settings.redactionStyle !== "blur" && settings.redactionStyle !== "black_box") {
+    throw new HttpError(400, "redactionStyle must be blur or black_box");
+  }
+
+  return settings.redactionStyle;
+}
+
+function parseTextCategories(settings: Record<string, unknown>) {
+  const rawCategories = settings.textCategories;
+
+  if (rawCategories === undefined) return undefined;
+
+  if (!Array.isArray(rawCategories)) {
+    throw new HttpError(400, "textCategories must be an array");
+  }
+
+  const allowedCategories = new Set<RedactionTextCategory>([
+    "sexual",
+    "profanity",
+    "credentials",
+    "id_document",
+  ]);
+
+  return rawCategories.map((category) => {
+    if (typeof category !== "string" || !allowedCategories.has(category as RedactionTextCategory)) {
+      throw new HttpError(
+        400,
+        "textCategories must contain only: sexual, profanity, credentials, id_document"
+      );
+    }
+
+    return category as RedactionTextCategory;
+  });
+}
+
+function parseCustomWords(settings: Record<string, unknown>) {
+  const rawWords = settings.customWords;
+
+  if (rawWords === undefined) return undefined;
+
+  if (!Array.isArray(rawWords)) {
+    throw new HttpError(400, "customWords must be an array");
+  }
+
+  if (rawWords.length > 50) {
+    throw new HttpError(400, "customWords cannot contain more than 50 words");
+  }
+
+  return rawWords.map((word) => {
+    if (typeof word !== "string") {
+      throw new HttpError(400, "customWords must contain only strings");
+    }
+
+    return word;
+  });
+}
+
+function parseIgnoredWords(settings: Record<string, unknown>) {
+  const rawWords = settings.ignoredWords;
+
+  if (rawWords === undefined) return undefined;
+
+  if (!Array.isArray(rawWords)) {
+    throw new HttpError(400, "ignoredWords must be an array");
+  }
+
+  if (rawWords.length > 50) {
+    throw new HttpError(400, "ignoredWords cannot contain more than 50 words");
+  }
+
+  return rawWords.map((word) => {
+    if (typeof word !== "string") {
+      throw new HttpError(400, "ignoredWords must contain only strings");
+    }
+
+    return word;
+  });
+}
+
 function parseRedactionSettings(body: Record<string, unknown>) {
   const rawSettings = body.redactionSettings;
 
@@ -75,6 +161,10 @@ function parseRedactionSettings(body: Record<string, unknown>) {
     faceBlur: parseBooleanSetting(settings, "faceBlur"),
     textBlur: parseBooleanSetting(settings, "textBlur"),
     licensePlateBlur: parseBooleanSetting(settings, "licensePlateBlur"),
+    redactionStyle: parseRedactionStyle(settings),
+    textCategories: parseTextCategories(settings),
+    customWords: parseCustomWords(settings),
+    ignoredWords: parseIgnoredWords(settings),
     minConfidence,
   });
 }

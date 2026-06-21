@@ -59,6 +59,29 @@ export async function getCurrentMonthUsage(
   return (result.Item as UsageRecord | undefined) ?? null;
 }
 
+export async function getCurrentMonthProjectUsage(params: {
+  accountId: string;
+  projectId: string;
+}): Promise<UsageRecord | null> {
+  const month = getCurrentMonth();
+
+  const result = await dynamoDbClient.send(
+    new GetCommand({
+      TableName: getUsageTableName(),
+      Key: {
+        usageKey: `${params.accountId}#${params.projectId}#${month}`,
+      },
+      ProjectionExpression:
+        "usageKey, accountId, projectId, planId, #month, requestsUsed, updatedAt",
+      ExpressionAttributeNames: {
+        "#month": "month",
+      },
+    })
+  );
+
+  return (result.Item as UsageRecord | undefined) ?? null;
+}
+
 export async function incrementUsage(
   params: IncrementUsageParams
 ): Promise<void> {
@@ -85,6 +108,37 @@ export async function incrementUsage(
         ":monthlyLimit": params.monthlyLimit,
         ":overageEnabled": params.overageEnabled,
         ":overagePriceCentsPerThousand": params.overagePriceCentsPerThousand,
+        ":month": month,
+      },
+    })
+  );
+}
+
+export async function incrementProjectUsage(params: {
+  accountId: string;
+  projectId: string;
+  planId: string;
+}): Promise<void> {
+  const month = getCurrentMonth();
+  const updatedAt = new Date().toISOString();
+
+  await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getUsageTableName(),
+      Key: {
+        usageKey: `${params.accountId}#${params.projectId}#${month}`,
+      },
+      UpdateExpression:
+        "ADD requestsUsed :inc SET updatedAt = :updatedAt, accountId = :accountId, projectId = :projectId, planId = :planId, #month = :month",
+      ExpressionAttributeNames: {
+        "#month": "month",
+      },
+      ExpressionAttributeValues: {
+        ":inc": 1,
+        ":updatedAt": updatedAt,
+        ":accountId": params.accountId,
+        ":projectId": params.projectId,
+        ":planId": params.planId,
         ":month": month,
       },
     })

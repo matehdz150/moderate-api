@@ -1,4 +1,4 @@
-export type PlanId = "free" | "starter" | "growth" | "scale";
+export type PlanId = "free" | "starter" | "plus" | "growth" | "scale";
 
 export interface PlanConfig {
   planId: PlanId;

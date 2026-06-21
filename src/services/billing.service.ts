@@ -53,6 +53,7 @@ function getPortalReturnUrl() {
 
 export function getStripePriceIdForPlan(planId: PlanId) {
   if (planId === "starter") return process.env.STRIPE_PRICE_STARTER;
+  if (planId === "plus") return process.env.STRIPE_PRICE_PLUS;
   if (planId === "growth") return process.env.STRIPE_PRICE_GROWTH;
   if (planId === "scale") return process.env.STRIPE_PRICE_SCALE;
   return undefined;
@@ -61,6 +62,7 @@ export function getStripePriceIdForPlan(planId: PlanId) {
 function getPlanIdForStripePrice(priceId: string): PlanId | null {
   const entries: Array<[PlanId, string | undefined]> = [
     ["starter", process.env.STRIPE_PRICE_STARTER],
+    ["plus", process.env.STRIPE_PRICE_PLUS],
     ["growth", process.env.STRIPE_PRICE_GROWTH],
     ["scale", process.env.STRIPE_PRICE_SCALE],
   ];
@@ -70,7 +72,7 @@ function getPlanIdForStripePrice(priceId: string): PlanId | null {
 
 function parsePaidPlanId(value: unknown): PaidPlanId {
   if (!isPlanId(value) || value === "free") {
-    throw new HttpError(400, "planId must be one of: starter, growth, scale");
+    throw new HttpError(400, "planId must be one of: starter, plus, growth, scale");
   }
 
   return value;
@@ -82,7 +84,7 @@ export function parseCheckoutPlanId(value: unknown): PaidPlanId {
 
 export function parseBillingChangePlanId(value: unknown): PlanId {
   if (!isPlanId(value)) {
-    throw new HttpError(400, "planId must be one of: free, starter, growth, scale");
+    throw new HttpError(400, "planId must be one of: free, starter, plus, growth, scale");
   }
 
   return value;
@@ -197,14 +199,14 @@ async function getSubscriptionPaymentClientSecret(subscription: Stripe.Subscript
     }
 
     const invoice = await getStripe().invoices.retrieve(latestInvoice.id, {
-      expand: ["payment_intent"],
+      expand: ["payment_intent", "confirmation_secret"],
     });
 
     return getInvoicePaymentClientSecret(invoice);
   }
 
   const invoice = await getStripe().invoices.retrieve(latestInvoice, {
-    expand: ["payment_intent"],
+    expand: ["payment_intent", "confirmation_secret"],
   });
 
   return getInvoicePaymentClientSecret(invoice);
@@ -269,7 +271,7 @@ export async function createSubscriptionIntent(params: {
       accountId,
       planId: params.planId,
     },
-    expand: ["latest_invoice.payment_intent"],
+    expand: ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"],
   });
   const clientSecret = await getSubscriptionPaymentClientSecret(subscription);
 

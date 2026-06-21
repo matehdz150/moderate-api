@@ -5,7 +5,7 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
   free: {
     planId: "free",
     name: "Free",
-    monthlyLimit: 500,
+    monthlyLimit: 1000,
     projectLimit: 1,
     apiKeyLimit: 1,
     logRetentionDays: 7,
@@ -16,35 +16,46 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
   starter: {
     planId: "starter",
     name: "Starter",
-    monthlyLimit: 10000,
+    monthlyLimit: 8000,
     projectLimit: 3,
     apiKeyLimit: 3,
     logRetentionDays: 30,
-    priceUsd: 29,
+    priceUsd: 19,
     overageEnabled: true,
-    overagePriceCentsPerThousand: 400,
+    overagePriceCentsPerThousand: 250,
+  },
+  plus: {
+    planId: "plus",
+    name: "Plus",
+    monthlyLimit: 16000,
+    projectLimit: 5,
+    apiKeyLimit: 5,
+    logRetentionDays: 60,
+    priceUsd: 39,
+    overageEnabled: true,
+    overagePriceCentsPerThousand: 240,
   },
   growth: {
     planId: "growth",
     name: "Growth",
-    monthlyLimit: 50000,
+    monthlyLimit: 38000,
     projectLimit: 10,
     apiKeyLimit: 10,
     logRetentionDays: 90,
-    priceUsd: 149,
+    priceUsd: 89,
     overageEnabled: true,
-    overagePriceCentsPerThousand: 300,
+    overagePriceCentsPerThousand: 225,
   },
   scale: {
     planId: "scale",
     name: "Scale",
-    monthlyLimit: 150000,
+    monthlyLimit: 110000,
     projectLimit: 50,
     apiKeyLimit: 50,
     logRetentionDays: 180,
-    priceUsd: 399,
+    priceUsd: 249,
     overageEnabled: true,
-    overagePriceCentsPerThousand: 250,
+    overagePriceCentsPerThousand: 200,
   },
 };
 
@@ -81,7 +92,7 @@ export function getPlanOverageConfig(planId: string) {
 
 export function parsePlanId(value: unknown): PlanId {
   if (!isPlanId(value)) {
-    throw new HttpError(400, "planId must be one of: free, starter, growth, scale");
+    throw new HttpError(400, "planId must be one of: free, starter, plus, growth, scale");
   }
 
   return value;

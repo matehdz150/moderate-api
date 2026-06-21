@@ -98,6 +98,10 @@ export async function updateAccountPlan(params: {
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripeCurrentPeriodEnd?: string;
+  stripePendingPlanId?: PlanId | null;
+  stripePlanChangeEffectiveAt?: string | null;
+  stripeScheduleId?: string | null;
+  stripeCancelAtPeriodEnd?: boolean | null;
   updatedAt: string;
 }): Promise<AccountRecord> {
   const result = await dynamoDbClient.send(
@@ -107,7 +111,7 @@ export async function updateAccountPlan(params: {
         accountId: params.accountId,
       },
       UpdateExpression:
-        "SET planId = :planId, monthlyLimit = :monthlyLimit, projectLimit = :projectLimit, apiKeyLimit = :apiKeyLimit, logRetentionDays = :logRetentionDays, stripeCustomerId = :stripeCustomerId, stripeSubscriptionId = :stripeSubscriptionId, stripeSubscriptionStatus = :stripeSubscriptionStatus, stripeCurrentPeriodEnd = :stripeCurrentPeriodEnd, updatedAt = :updatedAt",
+        "SET planId = :planId, monthlyLimit = :monthlyLimit, projectLimit = :projectLimit, apiKeyLimit = :apiKeyLimit, logRetentionDays = :logRetentionDays, stripeCustomerId = :stripeCustomerId, stripeSubscriptionId = :stripeSubscriptionId, stripeSubscriptionStatus = :stripeSubscriptionStatus, stripeCurrentPeriodEnd = :stripeCurrentPeriodEnd, stripePendingPlanId = :stripePendingPlanId, stripePlanChangeEffectiveAt = :stripePlanChangeEffectiveAt, stripeScheduleId = :stripeScheduleId, stripeCancelAtPeriodEnd = :stripeCancelAtPeriodEnd, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
         ":planId": params.planId,
         ":monthlyLimit": params.monthlyLimit,
@@ -116,6 +120,45 @@ export async function updateAccountPlan(params: {
         ":logRetentionDays": params.logRetentionDays,
         ":stripeCustomerId": params.stripeCustomerId ?? null,
         ":stripeSubscriptionId": params.stripeSubscriptionId ?? null,
+        ":stripeSubscriptionStatus": params.stripeSubscriptionStatus ?? null,
+        ":stripeCurrentPeriodEnd": params.stripeCurrentPeriodEnd ?? null,
+        ":stripePendingPlanId": params.stripePendingPlanId ?? null,
+        ":stripePlanChangeEffectiveAt": params.stripePlanChangeEffectiveAt ?? null,
+        ":stripeScheduleId": params.stripeScheduleId ?? null,
+        ":stripeCancelAtPeriodEnd": params.stripeCancelAtPeriodEnd ?? null,
+        ":updatedAt": params.updatedAt,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes as AccountRecord;
+}
+
+
+export async function updateAccountBillingChange(params: {
+  accountId: string;
+  stripePendingPlanId?: PlanId | null;
+  stripePlanChangeEffectiveAt?: string | null;
+  stripeScheduleId?: string | null;
+  stripeCancelAtPeriodEnd?: boolean | null;
+  stripeSubscriptionStatus?: string | null;
+  stripeCurrentPeriodEnd?: string | null;
+  updatedAt: string;
+}): Promise<AccountRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getAccountsTableName(),
+      Key: {
+        accountId: params.accountId,
+      },
+      UpdateExpression:
+        "SET stripePendingPlanId = :stripePendingPlanId, stripePlanChangeEffectiveAt = :stripePlanChangeEffectiveAt, stripeScheduleId = :stripeScheduleId, stripeCancelAtPeriodEnd = :stripeCancelAtPeriodEnd, stripeSubscriptionStatus = :stripeSubscriptionStatus, stripeCurrentPeriodEnd = :stripeCurrentPeriodEnd, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":stripePendingPlanId": params.stripePendingPlanId ?? null,
+        ":stripePlanChangeEffectiveAt": params.stripePlanChangeEffectiveAt ?? null,
+        ":stripeScheduleId": params.stripeScheduleId ?? null,
+        ":stripeCancelAtPeriodEnd": params.stripeCancelAtPeriodEnd ?? null,
         ":stripeSubscriptionStatus": params.stripeSubscriptionStatus ?? null,
         ":stripeCurrentPeriodEnd": params.stripeCurrentPeriodEnd ?? null,
         ":updatedAt": params.updatedAt,

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { updateApiKeysPlanByAccount } from "../auth/api-key.repository.js";
 import {
   getAccountById,
+  updateAccountBillingChange,
   updateAccountStripeCustomerId,
 } from "../repositories/account.repository.js";
 import { updateProjectsPlanByAccount } from "../repositories/project.repository.js";
@@ -12,7 +13,7 @@ import type { PaidPlanId } from "../types/billing.types.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
 import { HttpError } from "../utils/http-response.js";
 import { changeAccountPlan, ensureAccountForUser } from "./account.service.js";
-import { isPlanId } from "./plan.service.js";
+import { getPlanConfig, isPlanId } from "./plan.service.js";
 
 let stripeClient: Stripe | null = null;
 
@@ -78,6 +79,61 @@ function parsePaidPlanId(value: unknown): PaidPlanId {
 export function parseCheckoutPlanId(value: unknown): PaidPlanId {
   return parsePaidPlanId(value);
 }
+
+export function parseBillingChangePlanId(value: unknown): PlanId {
+  if (!isPlanId(value)) {
+    throw new HttpError(400, "planId must be one of: free, starter, growth, scale");
+  }
+
+  return value;
+}
+
+function getPlanRank(planId: PlanId) {
+  return getPlanConfig(planId).priceUsd;
+}
+
+function getPlanChangeDirection(currentPlanId: PlanId, targetPlanId: PlanId) {
+  if (currentPlanId === targetPlanId) return "same";
+  return getPlanRank(targetPlanId) > getPlanRank(currentPlanId) ? "upgrade" : "downgrade";
+}
+
+function getSubscriptionItem(subscription: Stripe.Subscription) {
+  const item = subscription.items.data[0];
+
+  if (!item) {
+    throw new HttpError(409, "Subscription has no billable item");
+  }
+
+  return item;
+}
+
+function getCurrentPlanIdFromSubscription(subscription: Stripe.Subscription): PlanId {
+  const priceId = getSubscriptionItem(subscription).price.id;
+  return getPlanIdForStripePrice(priceId) ?? "free";
+}
+
+function getPeriodEndIso(subscription: Stripe.Subscription) {
+  return getSubscriptionCurrentPeriodEnd(subscription) ?? new Date().toISOString();
+}
+
+async function updatePlanDependents(account: AccountRecord) {
+  const updatedAt = new Date().toISOString();
+
+  await Promise.all([
+    updateProjectsPlanByAccount({
+      accountId: account.accountId,
+      planId: account.planId,
+      monthlyLimit: account.monthlyLimit,
+      updatedAt,
+    }),
+    updateApiKeysPlanByAccount({
+      accountId: account.accountId,
+      planId: account.planId,
+      monthlyLimit: account.monthlyLimit,
+    }),
+  ]);
+}
+
 
 async function ensureStripeCustomer(account: AccountRecord) {
   if (account.stripeCustomerId) {
@@ -213,6 +269,236 @@ export async function createCheckoutSession(params: {
   };
 }
 
+export async function changeBillingPlan(params: {
+  authContext: CognitoAuthContext;
+  planId: PlanId;
+}) {
+  const account = await ensureAccountForUser({
+    userId: params.authContext.userId,
+    email: params.authContext.email,
+  });
+
+  if (params.planId === account.planId && !account.stripePendingPlanId) {
+    return {
+      account,
+      changeType: "none" as const,
+      effectiveAt: account.stripeCurrentPeriodEnd,
+    };
+  }
+
+  if (params.planId !== "free" && !getStripePriceIdForPlan(params.planId)) {
+    throw new HttpError(500, "Stripe price is not configured for this plan");
+  }
+
+  if (!account.stripeCustomerId || !account.stripeSubscriptionId) {
+    if (params.planId === "free") {
+      const updatedAccount = await changeAccountPlan({
+        accountId: account.accountId,
+        planId: "free",
+        stripeCustomerId: account.stripeCustomerId,
+        stripePendingPlanId: null,
+        stripePlanChangeEffectiveAt: null,
+        stripeScheduleId: null,
+        stripeCancelAtPeriodEnd: null,
+      });
+      await updatePlanDependents(updatedAccount);
+
+      return {
+        account: updatedAccount,
+        changeType: "immediate" as const,
+        effectiveAt: new Date().toISOString(),
+      };
+    }
+
+    throw new HttpError(409, "Complete checkout before changing to this plan");
+  }
+
+  let subscription = await getStripe().subscriptions.retrieve(account.stripeSubscriptionId);
+
+  if (["canceled", "incomplete_expired"].includes(subscription.status)) {
+    throw new HttpError(409, "Subscription is not active. Start a new checkout for this plan");
+  }
+
+  const currentPlanId = getCurrentPlanIdFromSubscription(subscription);
+  const targetPlanId = params.planId;
+  const direction = getPlanChangeDirection(currentPlanId, targetPlanId);
+
+  if (direction === "same") {
+    if (subscription.cancel_at_period_end || account.stripePendingPlanId) {
+      subscription = await getStripe().subscriptions.update(subscription.id, {
+        cancel_at_period_end: false,
+        metadata: {
+          ...subscription.metadata,
+          pendingPlanId: "",
+          pendingEffectiveAt: "",
+        },
+      });
+
+      if (subscription.schedule && typeof subscription.schedule === "string") {
+        await getStripe().subscriptionSchedules.release(subscription.schedule);
+      }
+    }
+
+    const updatedAccount = await updateAccountBillingChange({
+      accountId: account.accountId,
+      stripePendingPlanId: null,
+      stripePlanChangeEffectiveAt: null,
+      stripeScheduleId: null,
+      stripeCancelAtPeriodEnd: false,
+      stripeSubscriptionStatus: subscription.status,
+      stripeCurrentPeriodEnd: getSubscriptionCurrentPeriodEnd(subscription),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return {
+      account: updatedAccount,
+      changeType: "none" as const,
+      effectiveAt: getSubscriptionCurrentPeriodEnd(subscription),
+    };
+  }
+
+  if (targetPlanId === "free") {
+    if (subscription.schedule && typeof subscription.schedule === "string") {
+      await getStripe().subscriptionSchedules.release(subscription.schedule);
+    }
+
+    subscription = await getStripe().subscriptions.update(subscription.id, {
+      cancel_at_period_end: true,
+      metadata: {
+        ...subscription.metadata,
+        accountId: account.accountId,
+        pendingPlanId: "free",
+        pendingEffectiveAt: getPeriodEndIso(subscription),
+      },
+    });
+
+    const updatedAccount = await updateAccountBillingChange({
+      accountId: account.accountId,
+      stripePendingPlanId: "free",
+      stripePlanChangeEffectiveAt: getPeriodEndIso(subscription),
+      stripeScheduleId: null,
+      stripeCancelAtPeriodEnd: true,
+      stripeSubscriptionStatus: subscription.status,
+      stripeCurrentPeriodEnd: getSubscriptionCurrentPeriodEnd(subscription),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return {
+      account: updatedAccount,
+      changeType: "scheduled" as const,
+      effectiveAt: getPeriodEndIso(subscription),
+    };
+  }
+
+  const targetPriceId = getStripePriceIdForPlan(targetPlanId);
+
+  if (!targetPriceId) {
+    throw new HttpError(500, "Stripe price is not configured for this plan");
+  }
+
+  const item = getSubscriptionItem(subscription);
+
+  if (direction === "upgrade") {
+    if (subscription.schedule && typeof subscription.schedule === "string") {
+      await getStripe().subscriptionSchedules.release(subscription.schedule);
+    }
+
+    subscription = await getStripe().subscriptions.update(subscription.id, {
+      cancel_at_period_end: false,
+      items: [{ id: item.id, price: targetPriceId, quantity: item.quantity ?? 1 }],
+      metadata: {
+        ...subscription.metadata,
+        accountId: account.accountId,
+        planId: targetPlanId,
+        pendingPlanId: "",
+        pendingEffectiveAt: "",
+      },
+      payment_behavior: "pending_if_incomplete",
+      proration_behavior: "always_invoice",
+    });
+
+    await updateAccountFromSubscription(subscription);
+    const updatedAccount = (await getAccountById(account.accountId)) ?? account;
+
+    return {
+      account: updatedAccount,
+      changeType: "immediate" as const,
+      effectiveAt: new Date().toISOString(),
+    };
+  }
+
+  if (subscription.cancel_at_period_end) {
+    subscription = await getStripe().subscriptions.update(subscription.id, {
+      cancel_at_period_end: false,
+    });
+  }
+
+  let scheduleId = typeof subscription.schedule === "string" ? subscription.schedule : undefined;
+
+  if (!scheduleId) {
+    const schedule = await getStripe().subscriptionSchedules.create({
+      from_subscription: subscription.id,
+    });
+    scheduleId = schedule.id;
+  }
+
+  const schedule = await getStripe().subscriptionSchedules.retrieve(scheduleId);
+  const currentPhase = schedule.current_phase;
+  const phaseStart = currentPhase?.start_date ?? Math.floor(Date.now() / 1000);
+  const phaseEnd = currentPhase?.end_date ?? item.current_period_end;
+
+  if (!phaseEnd) {
+    throw new HttpError(409, "Subscription period end is not available");
+  }
+
+  await getStripe().subscriptionSchedules.update(scheduleId, {
+    end_behavior: "release",
+    proration_behavior: "none",
+    phases: [
+      {
+        start_date: phaseStart,
+        end_date: phaseEnd,
+        items: [{ price: item.price.id, quantity: item.quantity ?? 1 }],
+        metadata: {
+          accountId: account.accountId,
+          planId: currentPlanId,
+          pendingPlanId: targetPlanId,
+          pendingEffectiveAt: new Date(phaseEnd * 1000).toISOString(),
+        },
+      },
+      {
+        start_date: phaseEnd,
+        items: [{ price: targetPriceId, quantity: item.quantity ?? 1 }],
+        proration_behavior: "none",
+        metadata: {
+          accountId: account.accountId,
+          planId: targetPlanId,
+          pendingPlanId: "",
+          pendingEffectiveAt: "",
+        },
+      },
+    ],
+  } as any);
+
+  const effectiveAt = new Date(phaseEnd * 1000).toISOString();
+  const updatedAccount = await updateAccountBillingChange({
+    accountId: account.accountId,
+    stripePendingPlanId: targetPlanId,
+    stripePlanChangeEffectiveAt: effectiveAt,
+    stripeScheduleId: scheduleId,
+    stripeCancelAtPeriodEnd: false,
+    stripeSubscriptionStatus: subscription.status,
+    stripeCurrentPeriodEnd: getSubscriptionCurrentPeriodEnd(subscription),
+    updatedAt: new Date().toISOString(),
+  });
+
+  return {
+    account: updatedAccount,
+    changeType: "scheduled" as const,
+    effectiveAt,
+  };
+}
+
 export async function createPortalSession(authContext: CognitoAuthContext) {
   const account = await ensureAccountForUser({
     userId: authContext.userId,
@@ -260,10 +546,17 @@ async function updateAccountFromSubscription(subscription: Stripe.Subscription) 
 
   const status = subscription.status;
   const paidPlanId = getPlanIdForStripePrice(priceId);
-  const planId: PlanId =
-    paidPlanId && ["active", "trialing", "past_due"].includes(status)
-      ? paidPlanId
-      : "free";
+  const activeStatus = ["active", "trialing", "past_due"].includes(status);
+  const planId: PlanId = paidPlanId && activeStatus ? paidPlanId : "free";
+  const metadataPendingPlanId = isPlanId(subscription.metadata.pendingPlanId)
+    ? subscription.metadata.pendingPlanId
+    : null;
+  const existingPendingPlanId = account.stripePendingPlanId && account.stripePendingPlanId !== planId
+    ? account.stripePendingPlanId
+    : null;
+  const pendingPlanId = metadataPendingPlanId ?? existingPendingPlanId;
+  const pendingEffectiveAt = subscription.metadata.pendingEffectiveAt || account.stripePlanChangeEffectiveAt || null;
+  const hasPendingChange = pendingPlanId && pendingPlanId !== planId;
   const updatedAccount = await changeAccountPlan({
     accountId,
     planId,
@@ -274,22 +567,13 @@ async function updateAccountFromSubscription(subscription: Stripe.Subscription) 
     stripeSubscriptionId: subscription.id,
     stripeSubscriptionStatus: status,
     stripeCurrentPeriodEnd: getSubscriptionCurrentPeriodEnd(subscription),
+    stripePendingPlanId: hasPendingChange ? pendingPlanId : null,
+    stripePlanChangeEffectiveAt: hasPendingChange ? pendingEffectiveAt : null,
+    stripeScheduleId: typeof subscription.schedule === "string" ? subscription.schedule : null,
+    stripeCancelAtPeriodEnd: subscription.cancel_at_period_end,
   });
-  const updatedAt = new Date().toISOString();
 
-  await Promise.all([
-    updateProjectsPlanByAccount({
-      accountId,
-      planId: updatedAccount.planId,
-      monthlyLimit: updatedAccount.monthlyLimit,
-      updatedAt,
-    }),
-    updateApiKeysPlanByAccount({
-      accountId,
-      planId: updatedAccount.planId,
-      monthlyLimit: updatedAccount.monthlyLimit,
-    }),
-  ]);
+  await updatePlanDependents(updatedAccount);
 }
 
 export async function syncBillingAccount(authContext: CognitoAuthContext) {

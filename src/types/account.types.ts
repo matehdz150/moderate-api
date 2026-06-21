@@ -25,6 +25,10 @@ export interface AccountRecord {
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripeCurrentPeriodEnd?: string;
+  stripePendingPlanId?: PlanId;
+  stripePlanChangeEffectiveAt?: string;
+  stripeScheduleId?: string;
+  stripeCancelAtPeriodEnd?: boolean;
   createdAt: string;
   updatedAt: string;
 }

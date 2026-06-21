@@ -15,6 +15,10 @@ export async function createAccountForUser(params: {
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripeCurrentPeriodEnd?: string;
+  stripePendingPlanId?: PlanId | null;
+  stripePlanChangeEffectiveAt?: string | null;
+  stripeScheduleId?: string | null;
+  stripeCancelAtPeriodEnd?: boolean | null;
 }): Promise<AccountRecord> {
   const now = new Date().toISOString();
   const plan = getPlanConfig(params.planId);
@@ -66,6 +70,10 @@ export async function changeAccountPlan(params: {
   stripeSubscriptionId?: string;
   stripeSubscriptionStatus?: string;
   stripeCurrentPeriodEnd?: string;
+  stripePendingPlanId?: PlanId | null;
+  stripePlanChangeEffectiveAt?: string | null;
+  stripeScheduleId?: string | null;
+  stripeCancelAtPeriodEnd?: boolean | null;
 }): Promise<AccountRecord> {
   const now = new Date().toISOString();
   const plan = getPlanConfig(params.planId);
@@ -81,6 +89,10 @@ export async function changeAccountPlan(params: {
     stripeSubscriptionId: params.stripeSubscriptionId,
     stripeSubscriptionStatus: params.stripeSubscriptionStatus,
     stripeCurrentPeriodEnd: params.stripeCurrentPeriodEnd,
+    stripePendingPlanId: params.stripePendingPlanId,
+    stripePlanChangeEffectiveAt: params.stripePlanChangeEffectiveAt,
+    stripeScheduleId: params.stripeScheduleId,
+    stripeCancelAtPeriodEnd: params.stripeCancelAtPeriodEnd,
     updatedAt: now,
   });
 }

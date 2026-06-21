@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import {
+  changeBillingPlanRoute,
   createCheckoutSessionRoute,
   createPortalSessionRoute,
   createSubscriptionIntentRoute,
@@ -33,6 +34,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/billing/checkout-session") {
       return cognitoProtectedRoute(event, (authContext) =>
         createCheckoutSessionRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && (path === "/billing/change-plan" || path === "/billing/change-plan/")) {
+      return cognitoProtectedRoute(event, (authContext) =>
+        changeBillingPlanRoute(event, authContext)
       );
     }
 

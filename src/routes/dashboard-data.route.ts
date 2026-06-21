@@ -100,6 +100,10 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
       stripeSubscriptionId: account.stripeSubscriptionId,
       stripeSubscriptionStatus: account.stripeSubscriptionStatus,
       stripeCurrentPeriodEnd: account.stripeCurrentPeriodEnd,
+      stripePendingPlanId: account.stripePendingPlanId,
+      stripePlanChangeEffectiveAt: account.stripePlanChangeEffectiveAt,
+      stripeScheduleId: account.stripeScheduleId,
+      stripeCancelAtPeriodEnd: account.stripeCancelAtPeriodEnd,
     },
     projects: projects.map((project) => ({
       ...project,

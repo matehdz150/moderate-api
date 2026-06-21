@@ -1,9 +1,11 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
 import {
+  changeBillingPlan,
   createCheckoutSession,
   createPortalSession,
   createSubscriptionIntent,
+  parseBillingChangePlanId,
   parseCheckoutPlanId,
   processStripeWebhook,
   syncBillingAccount,
@@ -57,6 +59,38 @@ export async function createCheckoutSessionRoute(
   return ok(session);
 }
 
+export async function changeBillingPlanRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const body = parseJsonObjectBody(event.body);
+  const planId = parseBillingChangePlanId(body.planId);
+  const result = await changeBillingPlan({ authContext, planId });
+
+  return ok({
+    account: {
+      accountId: result.account.accountId,
+      email: result.account.email,
+      userId: result.account.userId,
+      planId: result.account.planId,
+      monthlyLimit: result.account.monthlyLimit,
+      projectLimit: result.account.projectLimit,
+      apiKeyLimit: result.account.apiKeyLimit,
+      logRetentionDays: result.account.logRetentionDays,
+      stripeCustomerId: result.account.stripeCustomerId,
+      stripeSubscriptionId: result.account.stripeSubscriptionId,
+      stripeSubscriptionStatus: result.account.stripeSubscriptionStatus,
+      stripeCurrentPeriodEnd: result.account.stripeCurrentPeriodEnd,
+      stripePendingPlanId: result.account.stripePendingPlanId,
+      stripePlanChangeEffectiveAt: result.account.stripePlanChangeEffectiveAt,
+      stripeScheduleId: result.account.stripeScheduleId,
+      stripeCancelAtPeriodEnd: result.account.stripeCancelAtPeriodEnd,
+    },
+    changeType: result.changeType,
+    effectiveAt: result.effectiveAt,
+  });
+}
+
 export async function createPortalSessionRoute(
   authContext: CognitoAuthContext
 ) {
@@ -82,6 +116,10 @@ export async function syncBillingRoute(authContext: CognitoAuthContext) {
       stripeSubscriptionId: account.stripeSubscriptionId,
       stripeSubscriptionStatus: account.stripeSubscriptionStatus,
       stripeCurrentPeriodEnd: account.stripeCurrentPeriodEnd,
+      stripePendingPlanId: account.stripePendingPlanId,
+      stripePlanChangeEffectiveAt: account.stripePlanChangeEffectiveAt,
+      stripeScheduleId: account.stripeScheduleId,
+      stripeCancelAtPeriodEnd: account.stripeCancelAtPeriodEnd,
     },
   });
 }

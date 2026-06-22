@@ -3,6 +3,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { dashboardRedactRoute } from "./routes/dashboard-redact.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { redactRoute } from "./routes/redact.route.js";
+import { dashboardRedactionLogsRoute, redactionLogsRoute } from "./routes/redaction-logs.route.js";
 import { corsPreflight, notFound } from "./utils/http-response.js";
 import { apiKeyProtectedRoute, cognitoProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
 
@@ -24,6 +25,18 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/dashboard/redact") {
       return cognitoProtectedRoute(event, (authContext) =>
         dashboardRedactRoute(event, authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/redaction-logs") {
+      return apiKeyProtectedRoute(event, (authContext) =>
+        redactionLogsRoute(authContext)
+      );
+    }
+
+    if (method === "GET" && path === "/dashboard/redaction-logs") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        dashboardRedactionLogsRoute(event, authContext)
       );
     }
 

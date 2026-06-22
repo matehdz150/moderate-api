@@ -37,3 +37,23 @@ export interface RedactionResponse {
   faces: RedactionFace[];
   regions: RedactionRegion[];
 }
+
+export interface RedactionLogRecord {
+  redactionId: string;
+  accountId: string;
+  projectId: string;
+  planId: string;
+  imageKey: string;
+  redactedImageKey: string;
+  style: "blur" | "black_box";
+  facesBlurred: number;
+  textBlurred: number;
+  licensePlatesBlurred: number;
+  regions: RedactionRegion[];
+  createdAt: string;
+}
+
+export interface RedactionLogEntry extends RedactionLogRecord {
+  imageUrl?: string;
+  redactedImageUrl?: string;
+}

@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { ulid } from "ulid";
 
 import { getProjectById } from "../repositories/project.repository.js";
+import { saveRedactionLog } from "../repositories/redaction-log.repository.js";
 import { detectFaces, detectText } from "../services/rekognition.service.js";
 import { getPlanRetentionDays } from "../services/plan.service.js";
 import { redactImage } from "../services/redaction.service.js";
@@ -209,6 +210,27 @@ export async function redactRoute(event: APIGatewayProxyEvent, authContext: Auth
     faces: redaction.faces,
     regions: redaction.regions,
   };
+
+  // Persist the redaction for the dashboard logs / detail drawer. A logging
+  // failure must never fail the redaction itself.
+  try {
+    await saveRedactionLog({
+      redactionId: response.redactionId,
+      accountId: authContext.accountId,
+      projectId: authContext.projectId,
+      planId: authContext.planId,
+      imageKey: response.imageKey,
+      redactedImageKey: response.redactedImageKey,
+      style: settings.redactionStyle,
+      facesBlurred: response.facesBlurred,
+      textBlurred: response.textBlurred,
+      licensePlatesBlurred: response.licensePlatesBlurred,
+      regions: response.regions,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Failed to persist redaction log", error);
+  }
 
   return ok(response);
 }

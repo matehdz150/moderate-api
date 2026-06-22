@@ -15,6 +15,7 @@ export {
 } from "./errors.js";
 export type {
   BinaryImageInput,
+  BoundingBox,
   BrandSafetyLevel,
   BrandSafetyResult,
   ComplianceResult,
@@ -26,6 +27,16 @@ export type {
   ModerationLogRecord,
   ModerationLogsResponse,
   ModerationResponse,
+  ProjectType,
+  RedactImageKeyParams,
+  RedactImageParams,
+  RedactionFace,
+  RedactionRegion,
+  RedactionRegionType,
+  RedactionResponse,
+  RedactionSettings,
+  RedactionStyle,
+  RedactionTextCategory,
   UploadUrlResponse,
   VisoraClientOptions,
 } from "./types.js";

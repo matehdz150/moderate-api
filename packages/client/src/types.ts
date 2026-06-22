@@ -1,5 +1,20 @@
 export type ModerationAction = "allow" | "review" | "reject";
 export type BrandSafetyLevel = "safe" | "caution" | "unsafe";
+export type ProjectType = "moderation" | "redaction";
+export type RedactionStyle = "blur" | "black_box";
+export type RedactionTextCategory =
+  | "sexual"
+  | "profanity"
+  | "credentials"
+  | "id_document";
+export type RedactionRegionType = "face" | "text" | "license_plate";
+
+export interface BoundingBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
 
 export interface ModerationDecisionExplanation {
   message: string;
@@ -61,6 +76,41 @@ export interface ModerationLogsResponse {
   logs: ModerationLogRecord[];
 }
 
+export interface RedactionSettings {
+  faceBlur: boolean;
+  textBlur: boolean;
+  licensePlateBlur: boolean;
+  redactionStyle: RedactionStyle;
+  textCategories: RedactionTextCategory[];
+  customWords: string[];
+  ignoredWords: string[];
+  minConfidence: number;
+}
+
+export interface RedactionFace {
+  confidence: number;
+  boundingBox: BoundingBox;
+}
+
+export interface RedactionRegion {
+  type: RedactionRegionType;
+  text?: string;
+  confidence: number;
+  boundingBox: BoundingBox;
+}
+
+export interface RedactionResponse {
+  redactionId: string;
+  imageKey: string;
+  redactedImageKey: string;
+  redactedImageUrl: string;
+  facesBlurred: number;
+  textBlurred: number;
+  licensePlatesBlurred: number;
+  faces: RedactionFace[];
+  regions: RedactionRegion[];
+}
+
 export type BinaryImageInput =
   | Blob
   | ArrayBuffer
@@ -74,6 +124,16 @@ export interface ModerateImageParams {
 }
 
 export interface ModerateImageKeyParams {
+  imageKey: string;
+}
+
+export interface RedactImageParams {
+  file: BinaryImageInput;
+  filename?: string;
+  contentType?: string;
+}
+
+export interface RedactImageKeyParams {
   imageKey: string;
 }
 

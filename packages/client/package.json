@@ -1,6 +1,6 @@
 {
   "name": "@visoracloud/client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Official Visora Cloud API client for Node.js and TypeScript",
   "type": "module",
   "main": "dist/index.js",
@@ -23,6 +23,8 @@
     "visora",
     "moderation",
     "image-moderation",
+    "redaction",
+    "image-redaction",
     "brand-safety",
     "api-client"
   ],

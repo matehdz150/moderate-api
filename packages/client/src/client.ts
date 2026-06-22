@@ -8,6 +8,9 @@ import type {
   ModerateImageParams,
   ModerationLogsResponse,
   ModerationResponse,
+  RedactImageKeyParams,
+  RedactImageParams,
+  RedactionResponse,
   UploadUrlResponse,
   VisoraClientOptions,
 } from "./types.js";
@@ -93,6 +96,31 @@ export class Visora {
     params: ModerateImageKeyParams
   ): Promise<ModerationResponse> {
     return this.request<ModerationResponse>("/moderate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ imageKey: params.imageKey }),
+    });
+  }
+
+  async redactImage(params: RedactImageParams): Promise<RedactionResponse> {
+    const contentType = params.contentType ?? "image/jpeg";
+    const filename = params.filename ?? "image.jpg";
+    const formData = new FormData();
+
+    formData.append("image", toImageBlob(params.file, contentType), filename);
+
+    return this.request<RedactionResponse>("/redact", {
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  async redactImageKey(
+    params: RedactImageKeyParams
+  ): Promise<RedactionResponse> {
+    return this.request<RedactionResponse>("/redact", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

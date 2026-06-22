@@ -10,6 +10,16 @@ const FACE_BLUR_SIGMA = 28;
 const TEXT_BLUR_SIGMA = 22;
 const LICENSE_PLATE_MIN_CONFIDENCE = 60;
 
+// Common license-plate shapes (after stripping separators/spaces). Plates vary
+// a lot by country, so we accept several letter/digit arrangements.
+const LICENSE_PLATE_PATTERNS = [
+  /^[A-Z]{1,3}\d{2,4}[A-Z]{0,3}$/, // GR3004D, ABC1234, AB12, A123BC
+  /^\d{1,4}[A-Z]{1,3}\d{0,4}$/, // 3004GR, 12AB345
+  /^[A-Z]\d{3}[A-Z]{3}$/, // A123BCD (EU style)
+  /^\d{3}[A-Z]{3}$/, // 123ABC
+  /^[A-Z]{3}\d{3,4}$/, // ABC123 / ABC1234
+];
+
 const TEXT_CATEGORY_TERMS: Record<string, string[]> = {
   sexual: [
     "sex",
@@ -102,6 +112,21 @@ const ID_DOCUMENT_LABEL_TERMS = [
   "estado",
   "country",
   "pais",
+  "document",
+  "documento",
+  "number",
+  "numero",
+  "número",
+  "clave",
+  "vigencia",
+  "expiration",
+  "expires",
+  "expedicion",
+  "expedición",
+  "elector",
+  "credencial",
+  "nss",
+  "ssn",
 ];
 
 interface TextRedactionContext {
@@ -167,13 +192,25 @@ function getRegionKey(
 function looksLikeLicensePlate(value: string) {
   const normalized = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-  if (normalized.length < 5 || normalized.length > 10) {
+  if (normalized.length < 4 || normalized.length > 10) {
     return false;
   }
 
   const letters = (normalized.match(/[A-Z]/g) ?? []).length;
   const digits = (normalized.match(/[0-9]/g) ?? []).length;
 
+  // A plate always mixes letters and digits.
+  if (letters < 1 || digits < 2) {
+    return false;
+  }
+
+  // Explicit plate shapes catch real-world formats (e.g. GR-3004D) that the
+  // generic letter/digit count alone would miss or mis-handle.
+  if (LICENSE_PLATE_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return true;
+  }
+
+  // Generic fallback: short alphanumeric with a clear letter+digit mix.
   return letters >= 2 && digits >= 2;
 }
 
@@ -272,13 +309,24 @@ function looksLikeSensitiveIdValue(value: string) {
   return false;
 }
 
+function looksLikeLabeledField(value: string) {
+  // A real "label: value" field has a separator or carries data (digits).
+  // Plain titles/headers ("Driver License", "Republic of Utopia") do not, so
+  // their sibling words should not be treated as sensitive values.
+  return /[:#=]/.test(value) || /\d/.test(value);
+}
+
 function hasSensitiveParentLine(text: TextDetection, context: TextRedactionContext) {
   if (text.ParentId == null) return false;
 
   const parentLine = context.lineById.get(text.ParentId);
   const parentText = parentLine?.DetectedText ?? "";
 
-  return isIdDocumentLabel(parentText) && !isIdDocumentLabel(text.DetectedText ?? "");
+  return (
+    isIdDocumentLabel(parentText) &&
+    looksLikeLabeledField(parentText) &&
+    !isIdDocumentLabel(text.DetectedText ?? "")
+  );
 }
 
 function hasNearbySensitiveLabel(text: TextDetection, context: TextRedactionContext) {
@@ -291,11 +339,20 @@ function hasNearbySensitiveLabel(text: TextDetection, context: TextRedactionCont
 
     if (!labelBox) return false;
 
+    // Value sitting just below the label.
     const verticallyNearBelow = textBox.top >= labelBox.top && textBox.top - labelBox.bottom <= 0.075;
     const horizontallyRelated =
       textBox.left >= labelBox.left - 0.04 && textBox.left <= labelBox.right + 0.32;
 
-    return verticallyNearBelow && horizontallyRelated;
+    if (verticallyNearBelow && horizontallyRelated) return true;
+
+    // Value on the same row, to the right of the label ("Name: John Doe").
+    const labelMidY = labelBox.top + labelBox.height / 2;
+    const textMidY = textBox.top + textBox.height / 2;
+    const onSameRow = Math.abs(textMidY - labelMidY) <= labelBox.height * 0.6;
+    const toTheRight = textBox.left >= labelBox.right - 0.02 && textBox.left - labelBox.right <= 0.3;
+
+    return onSameRow && toTheRight;
   });
 }
 

@@ -1,6 +1,6 @@
 # @visoracloud/client
 
-Official Node.js and TypeScript client for the Visora Cloud image moderation API.
+Official Node.js and TypeScript client for the Visora Cloud image moderation and redaction API.
 
 ## Install
 
@@ -36,6 +36,96 @@ const result = await visora.moderateImageKey({
   imageKey: "accounts/acc_123/projects/proj_123/uploads/image.jpg",
 });
 ```
+
+## Redact an image
+
+Redaction is available for paid plans and API keys attached to redaction projects. The SDK uploads the image and returns a processed image URL with configured regions blurred or black-boxed.
+
+```ts
+import { readFile } from "node:fs/promises";
+import { Visora } from "@visoracloud/client";
+
+const visora = new Visora({
+  apiKey: process.env.VISORA_REDACTION_API_KEY!,
+});
+
+const image = await readFile("./profile.jpg");
+
+const result = await visora.redactImage({
+  file: image,
+  filename: "profile.jpg",
+  contentType: "image/jpeg",
+});
+
+console.log(result.redactionId, result.redactedImageUrl);
+console.log(result.facesBlurred, result.textBlurred, result.licensePlatesBlurred);
+```
+
+## Redact an existing image key
+
+```ts
+const result = await visora.redactImageKey({
+  imageKey: "accounts/acc_123/projects/proj_123/uploads/image.jpg",
+});
+```
+
+The `imageKey` must belong to the same account and project as the API key.
+
+## Redaction response
+
+```ts
+interface RedactionResponse {
+  redactionId: string;
+  imageKey: string;
+  redactedImageKey: string;
+  redactedImageUrl: string;
+  facesBlurred: number;
+  textBlurred: number;
+  licensePlatesBlurred: number;
+  faces: RedactionFace[];
+  regions: RedactionRegion[];
+}
+```
+
+Region bounding boxes are normalized values from `0` to `1`:
+
+```ts
+type RedactionRegionType = "face" | "text" | "license_plate";
+
+interface RedactionRegion {
+  type: RedactionRegionType;
+  text?: string;
+  confidence: number;
+  boundingBox: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+}
+```
+
+## Redaction project settings
+
+Redaction behavior is configured per project from the Visora dashboard. The SDK exports these types for dashboard integrations and shared app types:
+
+```ts
+type RedactionStyle = "blur" | "black_box";
+type RedactionTextCategory = "sexual" | "profanity" | "credentials" | "id_document";
+
+interface RedactionSettings {
+  faceBlur: boolean;
+  textBlur: boolean;
+  licensePlateBlur: boolean;
+  redactionStyle: RedactionStyle;
+  textCategories: RedactionTextCategory[];
+  customWords: string[];
+  ignoredWords: string[];
+  minConfidence: number;
+}
+```
+
+Defaults are face blur on, text blur off, license plate blur off, `blur` style, no text categories, no custom/ignored words, and `minConfidence` of `80`.
 
 ## Webhook signatures
 

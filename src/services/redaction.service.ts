@@ -2,7 +2,7 @@ import sharp from "sharp";
 import type { BoundingBox, FaceDetail, TextDetection } from "@aws-sdk/client-rekognition";
 
 import type { RedactionFace, RedactionRegion, RedactionRegionType } from "../types/redaction.types.js";
-import type { RedactionSettings } from "../types/project.types.js";
+import type { RedactionSettings, RedactionTextCategory } from "../types/project.types.js";
 
 const FACE_PADDING_RATIO = 0.12;
 const TEXT_PADDING_RATIO = 0.18;
@@ -20,66 +20,57 @@ const LICENSE_PLATE_PATTERNS = [
   /^[A-Z]{3}\d{3,4}$/, // ABC123 / ABC1234
 ];
 
-const TEXT_CATEGORY_TERMS: Record<string, string[]> = {
-  sexual: [
-    "sex",
-    "sexual",
-    "porn",
-    "porno",
-    "nude",
-    "nudes",
-    "naked",
-    "escort",
-    "onlyfans",
-    "xxx",
-  ],
-  profanity: [
-    "fuck",
-    "shit",
-    "bitch",
-    "asshole",
-    "damn",
-    "puta",
-    "puto",
-    "pendejo",
-    "mierda",
-    "chingar",
-  ],
+// Keyword categories: the matched token text itself is the sensitive content.
+const VALUE_CATEGORY_TERMS: Partial<Record<RedactionTextCategory, string[]>> = {
+  sexual: ["sex", "sexual", "porn", "porno", "nude", "nudes", "naked", "escort", "onlyfans", "xxx"],
+  profanity: ["fuck", "shit", "bitch", "asshole", "damn", "puta", "puto", "pendejo", "mierda", "chingar"],
   credentials: [
     "password",
     "passwd",
     "passcode",
+    "contraseña",
     "secret",
     "token",
     "api_key",
     "apikey",
+    "api key",
     "authorization",
     "bearer",
     "private key",
-  ],
-  id_document: [
-    "name",
-    "nombre",
-    "first name",
-    "last name",
-    "apellido",
-    "apellidos",
-    "date of birth",
-    "fecha de nacimiento",
-    "birth",
-    "nacimiento",
-    "address",
-    "domicilio",
-    "nationality",
-    "nacionalidad",
-    "license",
-    "licencia",
-    "passport",
-    "pasaporte",
-    "curp",
-    "rfc",
+    "client_secret",
+    "access_token",
+    "refresh_token",
   ],
 };
+
+// Pattern categories: a token matching one of these regexes IS the sensitive value.
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const PHONE_RE = /\+?\d(?:[\d\s().-]{6,})\d/;
+const SSN_RE = /\b\d{3}-\d{2}-\d{4}\b/;
+const RFC_RE = /\b[A-Za-zÑñ&]{3,4}\d{6}[A-Za-z0-9]{2,3}\b/;
+const CURP_RE = /\b[A-Za-z]{4}\d{6}[HMhm][A-Za-z]{5}[A-Za-z0-9]\d\b/;
+const IBAN_RE = /\b[A-Za-z]{2}\d{2}[A-Za-z0-9]{10,30}\b/;
+const CLABE_RE = /\b\d{18}\b/;
+const CARD_RE = /\b(?:\d[ -]?){13,19}\b/;
+const API_TOKEN_RE = /\b(?:sk|pk|rk|ghp|gho|xox[baprs])[_-][A-Za-z0-9_-]{8,}\b/;
+const AWS_KEY_RE = /\bAKIA[0-9A-Z]{16}\b/;
+const JWT_RE = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/;
+
+function luhnValid(digits: string): boolean {
+  if (digits.length < 12) return false;
+  let sum = 0;
+  let alternate = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let n = Number(digits[i]);
+    if (alternate) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    alternate = !alternate;
+  }
+  return sum % 10 === 0;
+}
 
 const ID_DOCUMENT_LABEL_TERMS = [
   "name",
@@ -129,9 +120,39 @@ const ID_DOCUMENT_LABEL_TERMS = [
   "ssn",
 ];
 
+// Legal / medical record labels — the sensitive VALUE near these is redacted.
+const MEDICAL_LABEL_TERMS = [
+  "patient",
+  "paciente",
+  "patient id",
+  "record",
+  "record number",
+  "expediente",
+  "historia clinica",
+  "historia clínica",
+  "case",
+  "caso",
+  "case number",
+  "mrn",
+  "diagnosis",
+  "diagnostico",
+  "diagnóstico",
+  "insurance",
+  "poliza",
+  "póliza",
+  "nhs",
+];
+
+// Categories whose terms mark a LABEL; the value beside/below it is redacted.
+const LABEL_CATEGORY_TERMS: Partial<Record<RedactionTextCategory, string[]>> = {
+  id_document: ID_DOCUMENT_LABEL_TERMS,
+  medical: MEDICAL_LABEL_TERMS,
+};
+
 interface TextRedactionContext {
   lineById: Map<number, TextDetection>;
-  idLabelLines: TextDetection[];
+  labelLines: TextDetection[];
+  labelTerms: string[];
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -233,28 +254,79 @@ function containsTerm(value: string, term: string) {
   );
 }
 
-function matchesConfiguredText(value: string, settings: RedactionSettings) {
+function termHit(value: string, terms: string[]) {
+  return terms.some((term) => containsTerm(value, term));
+}
+
+function matchesPiiValue(value: string) {
+  return (
+    EMAIL_RE.test(value) ||
+    SSN_RE.test(value) ||
+    CURP_RE.test(value) ||
+    RFC_RE.test(value) ||
+    PHONE_RE.test(value)
+  );
+}
+
+function matchesFinancialValue(value: string) {
+  if (IBAN_RE.test(value) || CLABE_RE.test(value)) return true;
+
+  const cardMatch = value.match(CARD_RE);
+  return Boolean(cardMatch && luhnValid(cardMatch[0].replace(/\D/g, "")));
+}
+
+function matchesCredentialValue(value: string) {
+  return API_TOKEN_RE.test(value) || AWS_KEY_RE.test(value) || JWT_RE.test(value);
+}
+
+// True when the token's own text is sensitive under an enabled value category
+// (keyword categories + pattern categories) or a configured custom word.
+function matchesValueCategory(value: string, settings: RedactionSettings) {
   if (!value.trim()) return false;
 
   if (settings.customWords.some((word) => containsTerm(value, word))) {
     return true;
   }
 
-  return settings.textCategories.some((category) =>
-    (TEXT_CATEGORY_TERMS[category] ?? []).some((term) => containsTerm(value, term))
-  );
+  const categories = new Set(settings.textCategories);
+
+  if (categories.has("sexual") && termHit(value, VALUE_CATEGORY_TERMS.sexual ?? [])) return true;
+  if (categories.has("profanity") && termHit(value, VALUE_CATEGORY_TERMS.profanity ?? [])) return true;
+  if (
+    categories.has("credentials") &&
+    (termHit(value, VALUE_CATEGORY_TERMS.credentials ?? []) || matchesCredentialValue(value))
+  ) {
+    return true;
+  }
+  if (categories.has("pii") && matchesPiiValue(value)) return true;
+  if (categories.has("financial") && matchesFinancialValue(value)) return true;
+
+  return false;
 }
 
 function isIgnoredText(value: string, settings: RedactionSettings) {
   return settings.ignoredWords.some((word) => containsTerm(value, word));
 }
 
-function isIdDocumentMode(settings: RedactionSettings) {
-  return settings.textCategories.includes("id_document");
+// Label categories ("id_document", "medical") redact the VALUE near a label
+// rather than the label itself. Detected at the WORD level.
+function enabledLabelTerms(settings: RedactionSettings): string[] {
+  const terms: string[] = [];
+
+  for (const category of settings.textCategories) {
+    const categoryTerms = LABEL_CATEGORY_TERMS[category as RedactionTextCategory];
+    if (categoryTerms) terms.push(...categoryTerms);
+  }
+
+  return terms;
 }
 
-function isIdDocumentLabel(value: string) {
-  return ID_DOCUMENT_LABEL_TERMS.some((term) => containsTerm(value, term));
+function isLabelCategoryEnabled(settings: RedactionSettings) {
+  return settings.textCategories.some((category) => category === "id_document" || category === "medical");
+}
+
+function isLabelToken(value: string, context: TextRedactionContext) {
+  return termHit(value, context.labelTerms);
 }
 
 function getTextBox(text: TextDetection) {
@@ -274,21 +346,25 @@ function getTextBox(text: TextDetection) {
   };
 }
 
-function buildTextRedactionContext(textDetections: TextDetection[]): TextRedactionContext {
+function buildTextRedactionContext(
+  textDetections: TextDetection[],
+  settings: RedactionSettings
+): TextRedactionContext {
   const lineById = new Map<number, TextDetection>();
-  const idLabelLines: TextDetection[] = [];
+  const labelTerms = enabledLabelTerms(settings);
+  const labelLines: TextDetection[] = [];
 
   for (const text of textDetections) {
     if (text.Type !== "LINE" || text.Id == null) continue;
 
     lineById.set(text.Id, text);
 
-    if (isIdDocumentLabel(text.DetectedText ?? "")) {
-      idLabelLines.push(text);
+    if (labelTerms.length > 0 && termHit(text.DetectedText ?? "", labelTerms)) {
+      labelLines.push(text);
     }
   }
 
-  return { lineById, idLabelLines };
+  return { lineById, labelLines, labelTerms };
 }
 
 function looksLikeSensitiveIdValue(value: string) {
@@ -323,9 +399,9 @@ function hasSensitiveParentLine(text: TextDetection, context: TextRedactionConte
   const parentText = parentLine?.DetectedText ?? "";
 
   return (
-    isIdDocumentLabel(parentText) &&
+    isLabelToken(parentText, context) &&
     looksLikeLabeledField(parentText) &&
-    !isIdDocumentLabel(text.DetectedText ?? "")
+    !isLabelToken(text.DetectedText ?? "", context)
   );
 }
 
@@ -334,7 +410,7 @@ function hasNearbySensitiveLabel(text: TextDetection, context: TextRedactionCont
 
   if (!textBox) return false;
 
-  return context.idLabelLines.some((line) => {
+  return context.labelLines.some((line) => {
     const labelBox = getTextBox(line);
 
     if (!labelBox) return false;
@@ -356,10 +432,10 @@ function hasNearbySensitiveLabel(text: TextDetection, context: TextRedactionCont
   });
 }
 
-function isSensitiveIdDocumentValue(text: TextDetection, context: TextRedactionContext) {
+function isSensitiveLabeledValue(text: TextDetection, context: TextRedactionContext) {
   const value = text.DetectedText?.trim() ?? "";
 
-  if (!value || isIdDocumentLabel(value)) return false;
+  if (!value || isLabelToken(value, context)) return false;
   if (looksLikeSensitiveIdValue(value)) return true;
   if (hasSensitiveParentLine(text, context)) return true;
   if (hasNearbySensitiveLabel(text, context)) return true;
@@ -367,37 +443,41 @@ function isSensitiveIdDocumentValue(text: TextDetection, context: TextRedactionC
   return false;
 }
 
-function shouldUseWordLevelTextRedaction(settings: RedactionSettings) {
-  return settings.textBlur && (isIdDocumentMode(settings) || settings.ignoredWords.length > 0);
-}
-
-function shouldSkipTextDetection(
+// Unified decision for one detected text token. Plates are handled separately.
+//  - Master textBlur blurs whole lines (unless a label category drives selective
+//    word-level redaction instead).
+//  - Value categories (pii, financial, credentials, sexual, profanity) + custom
+//    words match the line's own text.
+//  - Label categories (id_document, medical) redact only the sensitive VALUE near
+//    a label, at the word level, never the label itself.
+function shouldRedactAsText(
   text: TextDetection,
   settings: RedactionSettings,
   context: TextRedactionContext
 ) {
+  // Text redaction is gated behind the master textBlur switch. With no
+  // categories or custom words it blurs all visible text; with categories it
+  // redacts only the configured data types.
+  if (!settings.textBlur) return false;
+
   const detectedText = text.DetectedText?.trim() ?? "";
 
-  if (!detectedText) return true;
+  if (!detectedText) return false;
+  if (isIgnoredText(detectedText, settings)) return false;
 
-  if (shouldUseWordLevelTextRedaction(settings) && text.Type === "LINE") {
-    return true;
+  const selective =
+    settings.textCategories.length > 0 || settings.customWords.length > 0;
+  const labelMode = isLabelCategoryEnabled(settings);
+
+  if (text.Type === "LINE") {
+    if (!selective) return true; // blur all visible text
+    if (matchesValueCategory(detectedText, settings)) return true;
+    return false;
   }
 
-  if (settings.textBlur && text.Type === "WORD" && !shouldUseWordLevelTextRedaction(settings)) {
-    return true;
-  }
-
-  if (isIgnoredText(detectedText, settings)) {
-    return true;
-  }
-
-  if (isIdDocumentMode(settings) && text.Type === "WORD" && isIdDocumentLabel(detectedText)) {
-    return true;
-  }
-
-  if (isIdDocumentMode(settings) && text.Type === "WORD") {
-    return !isSensitiveIdDocumentValue(text, context);
+  if (labelMode) {
+    if (isLabelToken(detectedText, context)) return false;
+    if (isSensitiveLabeledValue(text, context)) return true;
   }
 
   return false;
@@ -462,7 +542,7 @@ export async function redactImage(params: {
   const redactedFaces: RedactionFace[] = [];
   const regions: RedactionRegion[] = [];
   const redactedTextRegionKeys = new Set<string>();
-  const textContext = buildTextRedactionContext(textDetections);
+  const textContext = buildTextRedactionContext(textDetections, settings);
 
   for (const face of faces.filter((item) => (item.Confidence ?? 0) >= settings.minConfidence)) {
     const region = getFaceRegion(face, imageWidth, imageHeight);
@@ -514,15 +594,9 @@ export async function redactImage(params: {
       continue;
     }
 
-    if (!isPlate && shouldSkipTextDetection(text, settings, textContext)) {
-      continue;
-    }
-
     if (settings.licensePlateBlur && isPlate) {
       type = "license_plate";
-    } else if (settings.textBlur) {
-      type = "text";
-    } else if (settings.textBlur && matchesConfiguredText(detectedText, settings)) {
+    } else if (shouldRedactAsText(text, settings, textContext)) {
       type = "text";
     }
 

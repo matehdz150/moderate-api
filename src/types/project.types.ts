@@ -1,6 +1,13 @@
 export type ProjectType = "moderation" | "redaction";
 export type RedactionStyle = "blur" | "black_box";
-export type RedactionTextCategory = "sexual" | "profanity" | "credentials" | "id_document";
+export type RedactionTextCategory =
+  | "sexual"
+  | "profanity"
+  | "credentials"
+  | "id_document"
+  | "pii"
+  | "financial"
+  | "medical";
 
 export interface RedactionSettings {
   faceBlur: boolean;

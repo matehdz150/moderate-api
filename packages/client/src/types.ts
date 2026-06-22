@@ -6,7 +6,10 @@ export type RedactionTextCategory =
   | "sexual"
   | "profanity"
   | "credentials"
-  | "id_document";
+  | "id_document"
+  | "pii"
+  | "financial"
+  | "medical";
 export type RedactionRegionType = "face" | "text" | "license_plate";
 
 export interface BoundingBox {

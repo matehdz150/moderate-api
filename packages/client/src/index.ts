@@ -49,6 +49,7 @@ export type {
   NextWebhookHandlerOptions,
   VerifyWebhookSignatureParams,
   VisoraModerationCompletedData,
+  VisoraRedactionCompletedData,
   VisoraReviewDecisionData,
   VisoraReviewRequiredData,
   VisoraWebhookEvent,

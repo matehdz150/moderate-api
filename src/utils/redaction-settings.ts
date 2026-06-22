@@ -10,6 +10,9 @@ const TEXT_CATEGORIES = new Set<RedactionTextCategory>([
   "profanity",
   "credentials",
   "id_document",
+  "pii",
+  "financial",
+  "medical",
 ]);
 
 export const DEFAULT_REDACTION_SETTINGS: RedactionSettings = {

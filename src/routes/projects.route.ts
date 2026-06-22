@@ -78,13 +78,16 @@ function parseTextCategories(settings: Record<string, unknown>) {
     "profanity",
     "credentials",
     "id_document",
+    "pii",
+    "financial",
+    "medical",
   ]);
 
   return rawCategories.map((category) => {
     if (typeof category !== "string" || !allowedCategories.has(category as RedactionTextCategory)) {
       throw new HttpError(
         400,
-        "textCategories must contain only: sexual, profanity, credentials, id_document"
+        "textCategories must contain only: sexual, profanity, credentials, id_document, pii, financial, medical"
       );
     }
 

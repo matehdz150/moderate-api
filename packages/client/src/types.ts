@@ -9,7 +9,8 @@ export type RedactionTextCategory =
   | "id_document"
   | "pii"
   | "financial"
-  | "medical";
+  | "medical"
+  | "dates";
 export type RedactionRegionType = "face" | "text" | "license_plate";
 
 export interface BoundingBox {

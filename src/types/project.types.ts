@@ -7,7 +7,8 @@ export type RedactionTextCategory =
   | "id_document"
   | "pii"
   | "financial"
-  | "medical";
+  | "medical"
+  | "dates";
 
 export interface RedactionSettings {
   faceBlur: boolean;

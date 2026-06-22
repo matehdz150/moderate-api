@@ -56,6 +56,20 @@ const API_TOKEN_RE = /\b(?:sk|pk|rk|ghp|gho|xox[baprs])[_-][A-Za-z0-9_-]{8,}\b/;
 const AWS_KEY_RE = /\bAKIA[0-9A-Z]{16}\b/;
 const JWT_RE = /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/;
 
+// Dates in any common format (numeric separators + EN/ES month names).
+const DATE_MONTHS =
+  "january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sept|sep|oct|nov|dec|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|ene|abr|ago|set|oct|dic";
+const DATE_DMY_RE = /\b\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}\b/; // 03/08/1989, 12.5.90
+const DATE_ISO_RE = /\b\d{4}[/.\-]\d{1,2}[/.\-]\d{1,2}\b/; // 2024-01-02
+const DATE_DAY_MONTH_RE = new RegExp(
+  `\\b\\d{1,2}(?:st|nd|rd|th)?\\.?\\s+(?:${DATE_MONTHS})\\.?(?:\\s*,?\\s*\\d{2,4})?\\b`,
+  "i"
+);
+const DATE_MONTH_DAY_RE = new RegExp(
+  `\\b(?:${DATE_MONTHS})\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?\\.?(?:\\s*,?\\s*\\d{2,4})?\\b`,
+  "i"
+);
+
 function luhnValid(digits: string): boolean {
   if (digits.length < 12) return false;
   let sum = 0;
@@ -279,6 +293,15 @@ function matchesCredentialValue(value: string) {
   return API_TOKEN_RE.test(value) || AWS_KEY_RE.test(value) || JWT_RE.test(value);
 }
 
+function matchesDateValue(value: string) {
+  return (
+    DATE_DMY_RE.test(value) ||
+    DATE_ISO_RE.test(value) ||
+    DATE_DAY_MONTH_RE.test(value) ||
+    DATE_MONTH_DAY_RE.test(value)
+  );
+}
+
 // True when the token's own text is sensitive under an enabled value category
 // (keyword categories + pattern categories) or a configured custom word.
 function matchesValueCategory(value: string, settings: RedactionSettings) {
@@ -300,6 +323,7 @@ function matchesValueCategory(value: string, settings: RedactionSettings) {
   }
   if (categories.has("pii") && matchesPiiValue(value)) return true;
   if (categories.has("financial") && matchesFinancialValue(value)) return true;
+  if (categories.has("dates") && matchesDateValue(value)) return true;
 
   return false;
 }

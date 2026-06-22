@@ -13,6 +13,7 @@ const TEXT_CATEGORIES = new Set<RedactionTextCategory>([
   "pii",
   "financial",
   "medical",
+  "dates",
 ]);
 
 export const DEFAULT_REDACTION_SETTINGS: RedactionSettings = {

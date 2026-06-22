@@ -4,6 +4,7 @@ import { ulid } from "ulid";
 import { getProjectById } from "../repositories/project.repository.js";
 import { saveRedactionLog } from "../repositories/redaction-log.repository.js";
 import { detectFaces, detectText } from "../services/rekognition.service.js";
+import { publishWebhookEvent } from "../services/webhook-event.service.js";
 import { getPlanRetentionDays } from "../services/plan.service.js";
 import { redactImage } from "../services/redaction.service.js";
 import { createImageReadUrl, downloadImageObject, uploadImageObject } from "../services/s3.service.js";
@@ -213,6 +214,7 @@ export async function redactRoute(event: APIGatewayProxyEvent, authContext: Auth
 
   // Persist the redaction for the dashboard logs / detail drawer. A logging
   // failure must never fail the redaction itself.
+  const createdAt = new Date().toISOString();
   try {
     await saveRedactionLog({
       redactionId: response.redactionId,
@@ -226,11 +228,29 @@ export async function redactRoute(event: APIGatewayProxyEvent, authContext: Auth
       textBlurred: response.textBlurred,
       licensePlatesBlurred: response.licensePlatesBlurred,
       regions: response.regions,
-      createdAt: new Date().toISOString(),
+      createdAt,
     });
   } catch (error) {
     console.error("Failed to persist redaction log", error);
   }
+
+  // Async-delivered, HMAC-signed webhook. No-ops if webhook env is unset.
+  await publishWebhookEvent({
+    type: "redaction.completed",
+    accountId: authContext.accountId,
+    projectId: authContext.projectId,
+    payload: {
+      redactionId: response.redactionId,
+      imageKey: response.imageKey,
+      redactedImageKey: response.redactedImageKey,
+      style: settings.redactionStyle,
+      facesBlurred: response.facesBlurred,
+      textBlurred: response.textBlurred,
+      licensePlatesBlurred: response.licensePlatesBlurred,
+      regions: response.regions,
+      createdAt,
+    },
+  });
 
   return ok(response);
 }

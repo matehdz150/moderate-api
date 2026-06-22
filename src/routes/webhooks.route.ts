@@ -24,6 +24,7 @@ const SUPPORTED_EVENTS = new Set<WebhookEventType>([
   "moderation.review_required",
   "review.approved",
   "review.rejected",
+  "redaction.completed",
 ]);
 
 const DEFAULT_EVENTS: WebhookEventType[] = [

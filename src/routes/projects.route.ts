@@ -26,8 +26,12 @@ function parseProjectType(body: Record<string, unknown>) {
     return "moderation" as const;
   }
 
-  if (body.projectType !== "moderation" && body.projectType !== "redaction") {
-    throw new HttpError(400, "projectType must be moderation or redaction");
+  if (
+    body.projectType !== "moderation" &&
+    body.projectType !== "redaction" &&
+    body.projectType !== "verify"
+  ) {
+    throw new HttpError(400, "projectType must be moderation, redaction or verify");
   }
 
   return body.projectType;
@@ -213,6 +217,10 @@ export async function createProjectRoute(
 
   if (projectType === "redaction" && account.planId === "free") {
     throw new HttpError(403, "Redaction projects are available on paid plans only");
+  }
+
+  if (projectType === "verify" && account.planId === "free") {
+    throw new HttpError(403, "Verify projects are available on paid plans only");
   }
 
   const project = await createProject({

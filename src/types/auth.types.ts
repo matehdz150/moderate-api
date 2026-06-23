@@ -19,6 +19,7 @@ export interface UsageRecord {
   planId: string;
   month: string;
   requestsUsed: number;
+  verificationsUsed?: number;
   monthlyLimit?: number;
   overageEnabled?: boolean;
   overagePriceCentsPerThousand?: number;

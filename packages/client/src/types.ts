@@ -1,6 +1,7 @@
 export type ModerationAction = "allow" | "review" | "reject";
 export type BrandSafetyLevel = "safe" | "caution" | "unsafe";
-export type ProjectType = "moderation" | "redaction";
+export type ProjectType = "moderation" | "redaction" | "verify";
+export type VerifyDecision = "verified" | "review" | "rejected";
 export type RedactionStyle = "blur" | "black_box";
 export type RedactionTextCategory =
   | "sexual"
@@ -139,6 +140,76 @@ export interface RedactImageParams {
 
 export interface RedactImageKeyParams {
   imageKey: string;
+}
+
+export interface VerifySettings {
+  /** Face similarity (0-100) at/above which the result is auto-approved. */
+  faceMatchThreshold: number;
+  /** Face similarity below which the result is rejected. */
+  faceMatchRejectBelow: number;
+  /** Reject when the document's expiration date has passed. */
+  requireUnexpiredDocument: boolean;
+}
+
+export interface VerifyDocumentField {
+  key: string;
+  value: string;
+  confidence: number;
+}
+
+export interface VerifyDocumentResult {
+  detected: boolean;
+  type?: string;
+  fields: VerifyDocumentField[];
+  expired: boolean;
+  expirationDate?: string;
+}
+
+export interface VerifyFaceMatchResult {
+  matched: boolean;
+  /** Best similarity score (0-100) between the selfie and the document portrait. */
+  similarity: number;
+}
+
+export interface VerifySelfieResult {
+  quality: "pass" | "fail";
+  faceCount: number;
+  checks: {
+    singleFace: boolean;
+    eyesOpen: boolean;
+    noSunglasses: boolean;
+    sharp: boolean;
+    wellLit: boolean;
+  };
+}
+
+export interface VerifyResponse {
+  verificationId: string;
+  decision: VerifyDecision;
+  /** 0-100 confidence in the decision. */
+  confidence: number;
+  reasons: string[];
+  document: VerifyDocumentResult;
+  faceMatch: VerifyFaceMatchResult;
+  selfie: VerifySelfieResult;
+  documentImageKey: string;
+  selfieImageKey: string;
+  createdAt: string;
+}
+
+export interface VerifyImageParams {
+  /** Identity document image (ID, passport, license). */
+  document: BinaryImageInput;
+  /** A selfie of the person to match against the document. */
+  selfie: BinaryImageInput;
+  documentFilename?: string;
+  selfieFilename?: string;
+  contentType?: string;
+}
+
+export interface VerifyImageKeyParams {
+  documentImageKey: string;
+  selfieImageKey: string;
 }
 
 export interface VisoraClientOptions {

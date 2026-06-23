@@ -151,6 +151,96 @@ Defaults are face blur on, text blur off, license plate blur off, `blur` style, 
 
 `customWords` redacts exact words/phrases; `ignoredWords` prevents specific words (e.g. field labels) from being redacted.
 
+## Verify an identity
+
+Verify checks an identity document against a selfie in a single call: document authenticity (OCR), face match, and selfie quality / anti-spoof signals. It returns one decision — `verified`, `review`, or `rejected`. Use an API key attached to a **verify** project.
+
+```ts
+import { readFile } from "node:fs/promises";
+import { Visora } from "@visoracloud/client";
+
+const visora = new Visora({
+  apiKey: process.env.VISORA_VERIFY_API_KEY!,
+});
+
+const [document, selfie] = await Promise.all([
+  readFile("./id-document.jpg"),
+  readFile("./selfie.jpg"),
+]);
+
+const result = await visora.verifyImage({
+  document,
+  selfie,
+  contentType: "image/jpeg",
+});
+
+console.log(result.decision); // "verified" | "review" | "rejected"
+console.log(result.faceMatch.similarity); // 0-100
+console.log(result.reasons);
+```
+
+## Verify with existing image keys
+
+```ts
+const result = await visora.verifyImageKey({
+  documentImageKey: "accounts/acc_123/projects/proj_123/uploads/document.jpg",
+  selfieImageKey: "accounts/acc_123/projects/proj_123/uploads/selfie.jpg",
+});
+```
+
+Both keys must belong to the same account and project as the API key.
+
+## Verify response
+
+```ts
+interface VerifyResponse {
+  verificationId: string;
+  decision: "verified" | "review" | "rejected";
+  confidence: number; // 0-100, confidence in the decision
+  reasons: string[]; // human-readable flags, empty when fully verified
+  document: {
+    detected: boolean;
+    type?: string; // e.g. "DRIVER LICENSE", "PASSPORT"
+    fields: { key: string; value: string; confidence: number }[];
+    expired: boolean;
+    expirationDate?: string;
+  };
+  faceMatch: { matched: boolean; similarity: number };
+  selfie: {
+    quality: "pass" | "fail";
+    faceCount: number;
+    checks: {
+      singleFace: boolean;
+      eyesOpen: boolean;
+      noSunglasses: boolean;
+      sharp: boolean;
+      wellLit: boolean;
+    };
+  };
+  documentImageKey: string;
+  selfieImageKey: string;
+  createdAt: string;
+}
+```
+
+How the decision is reached:
+
+- **rejected** — no document detected, no face in either image, document expired (if required), or face match below the project's reject cutoff.
+- **verified** — face match at/above the auto-approve threshold, a valid document, and a passing selfie.
+- **review** — anything in between (e.g. a borderline face match or a low-quality selfie).
+
+## Verify project settings
+
+Thresholds are configured per project from the Visora dashboard:
+
+```ts
+interface VerifySettings {
+  faceMatchThreshold: number;    // auto-approve at/above this similarity (default 90)
+  faceMatchRejectBelow: number;  // reject below this similarity (default 60)
+  requireUnexpiredDocument: boolean; // reject expired documents (default true)
+}
+```
+
 ## Webhook signatures
 
 Visora signs every webhook delivery with:
@@ -205,6 +295,10 @@ export const POST = createNextWebhookHandler({
         // event.data is narrowed to VisoraRedactionCompletedData
         await storeRedactedImage(event.data.redactionId, event.data.redactedImageKey);
         break;
+      case "verification.completed":
+        // event.data is narrowed to VisoraVerificationCompletedData
+        await storeVerification(event.data.verificationId, event.data.decision);
+        break;
     }
   },
 });
@@ -244,6 +338,8 @@ const eventTypes: VisoraWebhookEventType[] = [
   "moderation.review_required",
   "review.approved",
   "review.rejected",
+  "redaction.completed",
+  "verification.completed",
 ];
 
 function handleEvent(event: VisoraWebhookEvent) {

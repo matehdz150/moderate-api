@@ -38,6 +38,15 @@ export type {
   RedactionStyle,
   RedactionTextCategory,
   UploadUrlResponse,
+  VerifyDecision,
+  VerifyDocumentField,
+  VerifyDocumentResult,
+  VerifyFaceMatchResult,
+  VerifyImageKeyParams,
+  VerifyImageParams,
+  VerifyResponse,
+  VerifySelfieResult,
+  VerifySettings,
   VisoraClientOptions,
 } from "./types.js";
 export type {
@@ -52,6 +61,7 @@ export type {
   VisoraRedactionCompletedData,
   VisoraReviewDecisionData,
   VisoraReviewRequiredData,
+  VisoraVerificationCompletedData,
   VisoraWebhookEvent,
   VisoraWebhookEventMap,
   VisoraWebhookEventType,

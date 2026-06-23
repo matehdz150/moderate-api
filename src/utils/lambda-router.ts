@@ -39,12 +39,15 @@ export async function handleLambdaRoute(
 
 export async function apiKeyProtectedRoute(
   event: APIGatewayProxyEvent,
-  route: (authContext: AuthContext) => Promise<APIGatewayProxyResult>
+  route: (authContext: AuthContext) => Promise<APIGatewayProxyResult>,
+  options?: { recordUsage?: boolean }
 ) {
   const authContext = await authenticateApiKey(event);
   const response = await route(authContext);
 
-  if (response.statusCode < 400) {
+  // Verify tracks its own per-verification usage, so it opts out of the shared
+  // request counter via { recordUsage: false }.
+  if (response.statusCode < 400 && options?.recordUsage !== false) {
     await recordUsage(authContext);
   }
 

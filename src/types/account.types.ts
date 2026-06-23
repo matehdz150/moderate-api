@@ -10,6 +10,10 @@ export interface PlanConfig {
   priceUsd: number;
   overageEnabled: boolean;
   overagePriceCentsPerThousand: number;
+  /** Verifications included per month (separate from the request limit). */
+  verifyIncluded: number;
+  /** Price per verification beyond the included amount, in cents. 0 = no overage (hard cap). */
+  verifyOverageCents: number;
 }
 
 export interface AccountRecord {

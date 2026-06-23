@@ -1,6 +1,5 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
-import { getCurrentMonthUsage, incrementProjectUsage, incrementUsage } from "../auth/usage.repository.js";
 import { getProjectById } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
 import { getPlanOverageConfig } from "../services/plan.service.js";
@@ -41,14 +40,10 @@ export async function dashboardVerifyRoute(
     throw new HttpError(400, "Selected project is not a verify project");
   }
 
-  const usageRecord = await getCurrentMonthUsage(account.accountId);
-  const requestsUsed = usageRecord?.requestsUsed ?? 0;
   const overageConfig = getPlanOverageConfig(account.planId);
 
-  if (!overageConfig.overageEnabled && requestsUsed >= account.monthlyLimit) {
-    throw new HttpError(429, "Monthly usage limit exceeded");
-  }
-
+  // verifyRoute enforces the verify allotment and records its own usage/overage,
+  // so the playground does not touch the shared request counter here.
   const authContext: AuthContext = {
     apiKeyHash: "dashboard-playground",
     accountId: account.accountId,
@@ -57,28 +52,8 @@ export async function dashboardVerifyRoute(
     monthlyLimit: account.monthlyLimit,
     overageEnabled: overageConfig.overageEnabled,
     overagePriceCentsPerThousand: overageConfig.overagePriceCentsPerThousand,
-    requestsUsed,
+    requestsUsed: 0,
   };
 
-  const response = await verifyRoute(event, authContext);
-
-  if (response.statusCode < 400) {
-    await Promise.all([
-      incrementUsage({
-        accountId: authContext.accountId,
-        projectId: authContext.projectId,
-        planId: authContext.planId,
-        monthlyLimit: authContext.monthlyLimit,
-        overageEnabled: authContext.overageEnabled,
-        overagePriceCentsPerThousand: authContext.overagePriceCentsPerThousand,
-      }),
-      incrementProjectUsage({
-        accountId: authContext.accountId,
-        projectId: authContext.projectId,
-        planId: authContext.planId,
-      }),
-    ]);
-  }
-
-  return response;
+  return verifyRoute(event, authContext);
 }

@@ -7,6 +7,7 @@ import {
 import { getPolicyByProjectId } from "../repositories/policy.repository.js";
 import { listProjectsByAccount } from "../repositories/project.repository.js";
 import { getDefaultModerationPolicy } from "../services/policy-engine.service.js";
+import { getVerifyAllowance } from "../services/plan.service.js";
 import { ensureAccountForUser } from "../services/account.service.js";
 import { createImageReadUrl } from "../services/s3.service.js";
 import type { CognitoAuthContext } from "../types/cognito.types.js";
@@ -100,6 +101,15 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
     (overageRequests / 1000) * overagePriceCentsPerThousand
   );
 
+  const verificationsUsed = usage?.verificationsUsed ?? 0;
+  const verifyAllowance = getVerifyAllowance(account.planId);
+  const verifyOverageCount = Math.max(
+    0,
+    verificationsUsed - verifyAllowance.included
+  );
+  const estimatedVerifyOverageCents =
+    verifyOverageCount * verifyAllowance.overageCents;
+
   return ok({
     account: {
       accountId: account.accountId,
@@ -140,6 +150,11 @@ export async function dashboardDataRoute(authContext: CognitoAuthContext) {
       overageRequests,
       overagePriceCentsPerThousand,
       estimatedOverageCents,
+      verificationsUsed,
+      verifyIncluded: verifyAllowance.included,
+      verifyOverageCount,
+      verifyOverageCents: verifyAllowance.overageCents,
+      estimatedVerifyOverageCents,
     },
   });
 }

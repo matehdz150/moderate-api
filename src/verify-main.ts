@@ -17,8 +17,10 @@ export async function handler(event: APIGatewayProxyEvent) {
     }
 
     if (method === "POST" && path === "/verify") {
-      return apiKeyProtectedRoute(event, (authContext) =>
-        verifyRoute(event, authContext)
+      return apiKeyProtectedRoute(
+        event,
+        (authContext) => verifyRoute(event, authContext),
+        { recordUsage: false }
       );
     }
 

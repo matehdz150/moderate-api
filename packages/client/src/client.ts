@@ -12,6 +12,9 @@ import type {
   RedactImageParams,
   RedactionResponse,
   UploadUrlResponse,
+  VerifyImageKeyParams,
+  VerifyImageParams,
+  VerifyResponse,
   VisoraClientOptions,
 } from "./types.js";
 
@@ -126,6 +129,42 @@ export class Visora {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ imageKey: params.imageKey }),
+    });
+  }
+
+  async verifyImage(params: VerifyImageParams): Promise<VerifyResponse> {
+    const contentType = params.contentType ?? "image/jpeg";
+    const formData = new FormData();
+
+    formData.append(
+      "document",
+      toImageBlob(params.document, contentType),
+      params.documentFilename ?? "document.jpg"
+    );
+    formData.append(
+      "selfie",
+      toImageBlob(params.selfie, contentType),
+      params.selfieFilename ?? "selfie.jpg"
+    );
+
+    return this.request<VerifyResponse>("/verify", {
+      method: "POST",
+      body: formData,
+    });
+  }
+
+  async verifyImageKey(
+    params: VerifyImageKeyParams
+  ): Promise<VerifyResponse> {
+    return this.request<VerifyResponse>("/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        documentImageKey: params.documentImageKey,
+        selfieImageKey: params.selfieImageKey,
+      }),
     });
   }
 

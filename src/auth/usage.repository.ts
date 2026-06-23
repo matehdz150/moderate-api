@@ -49,7 +49,7 @@ export async function getCurrentMonthUsage(
         usageKey,
       },
       ProjectionExpression:
-        "usageKey, accountId, projectId, planId, #month, requestsUsed, monthlyLimit, overageEnabled, overagePriceCentsPerThousand, updatedAt",
+        "usageKey, accountId, projectId, planId, #month, requestsUsed, verificationsUsed, monthlyLimit, overageEnabled, overagePriceCentsPerThousand, updatedAt",
       ExpressionAttributeNames: {
         "#month": "month",
       },
@@ -57,6 +57,39 @@ export async function getCurrentMonthUsage(
   );
 
   return (result.Item as UsageRecord | undefined) ?? null;
+}
+
+/** Account-level monthly verification counter, separate from requestsUsed. Returns the new count. */
+export async function incrementVerificationUsage(params: {
+  accountId: string;
+  planId: string;
+}): Promise<number> {
+  const month = getCurrentMonth();
+  const updatedAt = new Date().toISOString();
+
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getUsageTableName(),
+      Key: {
+        usageKey: getUsageKey(params.accountId, month),
+      },
+      UpdateExpression:
+        "ADD verificationsUsed :inc SET updatedAt = :updatedAt, accountId = :accountId, planId = :planId, #month = :month",
+      ExpressionAttributeNames: {
+        "#month": "month",
+      },
+      ExpressionAttributeValues: {
+        ":inc": 1,
+        ":updatedAt": updatedAt,
+        ":accountId": params.accountId,
+        ":planId": params.planId,
+        ":month": month,
+      },
+      ReturnValues: "UPDATED_NEW",
+    })
+  );
+
+  return (result.Attributes?.verificationsUsed as number | undefined) ?? 1;
 }
 
 export async function getCurrentMonthProjectUsage(params: {

@@ -24,6 +24,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     priceUsd: 0,
     overageEnabled: false,
     overagePriceCentsPerThousand: 0,
+    verifyIncluded: 25,
+    verifyOverageCents: 0,
   },
   starter: {
     planId: "starter",
@@ -35,6 +37,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     priceUsd: 19,
     overageEnabled: true,
     overagePriceCentsPerThousand: 250,
+    verifyIncluded: 100,
+    verifyOverageCents: 40,
   },
   plus: {
     planId: "plus",
@@ -46,6 +50,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     priceUsd: 39,
     overageEnabled: true,
     overagePriceCentsPerThousand: 240,
+    verifyIncluded: 300,
+    verifyOverageCents: 40,
   },
   growth: {
     planId: "growth",
@@ -57,6 +63,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     priceUsd: 89,
     overageEnabled: true,
     overagePriceCentsPerThousand: 225,
+    verifyIncluded: 750,
+    verifyOverageCents: 40,
   },
   scale: {
     planId: "scale",
@@ -68,6 +76,8 @@ export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
     priceUsd: 249,
     overageEnabled: true,
     overagePriceCentsPerThousand: 200,
+    verifyIncluded: 2500,
+    verifyOverageCents: 40,
   },
 };
 
@@ -100,6 +110,12 @@ export function getPlanOverageConfig(planId: string) {
     overageEnabled: plan.overageEnabled,
     overagePriceCentsPerThousand: plan.overagePriceCentsPerThousand,
   };
+}
+
+export function getVerifyAllowance(planId: string): { included: number; overageCents: number } {
+  if (!isPlanId(planId)) return { included: 0, overageCents: 0 };
+  const plan = PLAN_CONFIGS[planId];
+  return { included: plan.verifyIncluded, overageCents: plan.verifyOverageCents };
 }
 
 export function parsePlanId(value: unknown): PlanId {

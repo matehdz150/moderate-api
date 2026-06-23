@@ -9,6 +9,7 @@ import type {
   ModerationResponse,
   RedactionRegion,
   RedactionStyle,
+  VerifyDecision,
 } from "./types.js";
 
 export type VisoraWebhookEventType =
@@ -16,7 +17,8 @@ export type VisoraWebhookEventType =
   | "moderation.review_required"
   | "review.approved"
   | "review.rejected"
-  | "redaction.completed";
+  | "redaction.completed"
+  | "verification.completed";
 
 export interface VisoraModerationCompletedData extends ModerationResponse {
   imageKey: string;
@@ -65,12 +67,26 @@ export interface VisoraRedactionCompletedData {
   createdAt: string;
 }
 
+export interface VisoraVerificationCompletedData {
+  verificationId: string;
+  decision: VerifyDecision;
+  confidence: number;
+  faceMatchSimilarity: number;
+  documentType?: string;
+  documentDetected: boolean;
+  documentExpired: boolean;
+  selfieQuality: "pass" | "fail";
+  reasons: string[];
+  createdAt: string;
+}
+
 export interface VisoraWebhookEventMap {
   "moderation.completed": VisoraModerationCompletedData;
   "moderation.review_required": VisoraReviewRequiredData;
   "review.approved": VisoraReviewDecisionData;
   "review.rejected": VisoraReviewDecisionData;
   "redaction.completed": VisoraRedactionCompletedData;
+  "verification.completed": VisoraVerificationCompletedData;
 }
 
 export type VisoraWebhookEvent<

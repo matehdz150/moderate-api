@@ -1,11 +1,13 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import { ulid } from "ulid";
 
+import { getCurrentMonthUsage } from "../auth/usage.repository.js";
 import { getProjectById } from "../repositories/project.repository.js";
-import { countVerifyLogsByProjectSince, saveVerifyLog } from "../repositories/verify-log.repository.js";
-import { FREE_MONTHLY_VERIFICATIONS, getMonthStartIso, getPlanRetentionDays } from "../services/plan.service.js";
+import { saveVerifyLog } from "../repositories/verify-log.repository.js";
+import { getPlanRetentionDays, getVerifyAllowance } from "../services/plan.service.js";
 import { uploadImageObject } from "../services/s3.service.js";
 import { verifyIdentity } from "../services/verify.service.js";
+import { recordVerificationUsage } from "../services/verify-usage.service.js";
 import { publishWebhookEvent } from "../services/webhook-event.service.js";
 import type { AuthContext } from "../types/auth.types.js";
 import type { VerifyImageRequest, VerifyResponse } from "../types/verify.types.js";
@@ -45,17 +47,19 @@ function isMultipartRequest(event: APIGatewayProxyEvent) {
 }
 
 async function assertVerifyQuota(authContext: AuthContext) {
-  if (authContext.planId !== "free") return;
+  const { included, overageCents } = getVerifyAllowance(authContext.planId);
 
-  const used = await countVerifyLogsByProjectSince(
-    authContext.projectId,
-    getMonthStartIso()
-  );
+  // Paid plans bill overage beyond the included amount — no hard cap.
+  if (overageCents > 0) return;
 
-  if (used >= FREE_MONTHLY_VERIFICATIONS) {
+  // Free (or unknown) plans are hard-capped at the included monthly allotment.
+  const usage = await getCurrentMonthUsage(authContext.accountId);
+  const used = usage?.verificationsUsed ?? 0;
+
+  if (used >= included) {
     throw new HttpError(
       403,
-      `Free plan is limited to ${FREE_MONTHLY_VERIFICATIONS} verifications per month. Upgrade to a paid plan for unlimited verifications.`
+      `Free plan is limited to ${included} verifications per month. Upgrade to a paid plan for more.`
     );
   }
 }
@@ -244,6 +248,13 @@ export async function verifyRoute(event: APIGatewayProxyEvent, authContext: Auth
       reasons: response.reasons,
       createdAt,
     },
+  });
+
+  // Count this verification against the account's monthly allotment and bill
+  // overage for paid plans. Never fails the verification.
+  await recordVerificationUsage({
+    accountId: authContext.accountId,
+    planId: authContext.planId,
   });
 
   return ok(response);

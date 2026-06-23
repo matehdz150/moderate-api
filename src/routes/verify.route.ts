@@ -2,8 +2,8 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { ulid } from "ulid";
 
 import { getProjectById } from "../repositories/project.repository.js";
-import { saveVerifyLog } from "../repositories/verify-log.repository.js";
-import { getPlanRetentionDays } from "../services/plan.service.js";
+import { countVerifyLogsByProjectSince, saveVerifyLog } from "../repositories/verify-log.repository.js";
+import { FREE_MONTHLY_VERIFICATIONS, getMonthStartIso, getPlanRetentionDays } from "../services/plan.service.js";
 import { uploadImageObject } from "../services/s3.service.js";
 import { verifyIdentity } from "../services/verify.service.js";
 import { publishWebhookEvent } from "../services/webhook-event.service.js";
@@ -44,9 +44,19 @@ function isMultipartRequest(event: APIGatewayProxyEvent) {
     .startsWith("multipart/form-data");
 }
 
-function assertPaidPlan(authContext: AuthContext) {
-  if (authContext.planId === "free") {
-    throw new HttpError(403, "Identity verification is available on paid plans only");
+async function assertVerifyQuota(authContext: AuthContext) {
+  if (authContext.planId !== "free") return;
+
+  const used = await countVerifyLogsByProjectSince(
+    authContext.projectId,
+    getMonthStartIso()
+  );
+
+  if (used >= FREE_MONTHLY_VERIFICATIONS) {
+    throw new HttpError(
+      403,
+      `Free plan is limited to ${FREE_MONTHLY_VERIFICATIONS} verifications per month. Upgrade to a paid plan for unlimited verifications.`
+    );
   }
 }
 
@@ -159,7 +169,7 @@ export async function verifyRoute(event: APIGatewayProxyEvent, authContext: Auth
     throw new Error("IMAGES_BUCKET_NAME is not configured");
   }
 
-  assertPaidPlan(authContext);
+  await assertVerifyQuota(authContext);
 
   const source = await getVerifyImageSource(event, authContext);
 
@@ -176,6 +186,7 @@ export async function verifyRoute(event: APIGatewayProxyEvent, authContext: Auth
     bucketName: IMAGES_BUCKET_NAME,
     documentImageKey: source.documentImageKey,
     selfieImageKey: source.selfieImageKey,
+    settings: project.verifySettings,
   });
 
   const createdAt = new Date().toISOString();

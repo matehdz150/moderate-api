@@ -1,3 +1,5 @@
+import type { VerifySettings } from "./verify.types.js";
+
 export type ProjectType = "moderation" | "redaction" | "verify";
 export type RedactionStyle = "blur" | "black_box";
 export type RedactionTextCategory =
@@ -27,6 +29,7 @@ export interface ProjectRecord {
   name: string;
   projectType: ProjectType;
   redactionSettings?: RedactionSettings;
+  verifySettings?: VerifySettings;
   planId: string;
   monthlyLimit: number;
   createdAt: string;

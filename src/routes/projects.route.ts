@@ -6,6 +6,7 @@ import {
   deleteProjectRecord,
   listProjectsByAccount,
   updateProjectRedactionSettings,
+  updateProjectVerifySettings,
   updateProjectName,
 } from "../repositories/project.repository.js";
 import { ensureAccountForUser } from "../services/account.service.js";
@@ -16,10 +17,12 @@ import type {
   RedactionStyle,
   RedactionTextCategory,
 } from "../types/project.types.js";
+import type { VerifySettings } from "../types/verify.types.js";
 import { HttpError, ok } from "../utils/http-response.js";
 import { parseJsonObjectBody } from "../utils/request-body.js";
 import { getDashboardAccountId } from "../utils/dashboard-account.js";
 import { normalizeRedactionSettings } from "../utils/redaction-settings.js";
+import { normalizeVerifySettings } from "../utils/verify-settings.js";
 
 function parseProjectType(body: Record<string, unknown>) {
   if (body.projectType === undefined) {
@@ -215,13 +218,8 @@ export async function createProjectRoute(
     throw new HttpError(403, "Project limit reached for current plan");
   }
 
-  if (projectType === "redaction" && account.planId === "free") {
-    throw new HttpError(403, "Redaction projects are available on paid plans only");
-  }
-
-  if (projectType === "verify" && account.planId === "free") {
-    throw new HttpError(403, "Verify projects are available on paid plans only");
-  }
+  // Free can create redaction/verify projects too — usage is capped per month
+  // at request time (see redact/verify routes), not blocked at creation.
 
   const project = await createProject({
     accountId: account.accountId,
@@ -261,6 +259,68 @@ export async function updateProjectRedactionSettingsRoute(
   } catch (error) {
     if (isConditionalCheckFailed(error)) {
       throw new HttpError(404, "Redaction project not found");
+    }
+
+    throw error;
+  }
+}
+
+function parseVerifySettings(body: Record<string, unknown>): VerifySettings | undefined {
+  const rawSettings = body.verifySettings;
+
+  if (rawSettings === undefined) {
+    return undefined;
+  }
+
+  if (!rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) {
+    throw new HttpError(400, "verifySettings must be an object");
+  }
+
+  const settings = rawSettings as Record<string, unknown>;
+
+  for (const key of ["faceMatchThreshold", "faceMatchRejectBelow"] as const) {
+    const value = settings[key];
+    if (value !== undefined && (typeof value !== "number" || !Number.isFinite(value))) {
+      throw new HttpError(400, `${key} must be a number`);
+    }
+  }
+
+  return normalizeVerifySettings({
+    faceMatchThreshold: settings.faceMatchThreshold as number | undefined,
+    faceMatchRejectBelow: settings.faceMatchRejectBelow as number | undefined,
+    requireUnexpiredDocument:
+      typeof settings.requireUnexpiredDocument === "boolean"
+        ? settings.requireUnexpiredDocument
+        : undefined,
+  });
+}
+
+export async function updateProjectVerifySettingsRoute(
+  event: APIGatewayProxyEvent,
+  authContext: CognitoAuthContext
+) {
+  const body = parseJsonObjectBody(event.body);
+  const projectId = parseProjectId(body);
+  const verifySettings = parseVerifySettings(body);
+
+  if (!verifySettings) {
+    throw new HttpError(400, "verifySettings is required");
+  }
+
+  const accountId = getDashboardAccountId(authContext.userId);
+
+  try {
+    const project = await updateProjectVerifySettings({
+      accountId,
+      projectId,
+      verifySettings,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return ok({ project });
+  } catch (error) {
+    if (isConditionalCheckFailed(error)) {
+      throw new HttpError(404, "Verify project not found");
     }
 
     throw error;

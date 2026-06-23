@@ -30,6 +30,7 @@ import {
   listProjectsRoute,
   renameProjectRoute,
   updateProjectRedactionSettingsRoute,
+  updateProjectVerifySettingsRoute,
 } from "./routes/projects.route.js";
 import { cognitoProtectedRoute, getRoutePath, handleLambdaRoute } from "./utils/lambda-router.js";
 import { corsPreflight, notFound } from "./utils/http-response.js";
@@ -98,6 +99,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "PUT" && path === "/projects/redaction-settings") {
       return cognitoProtectedRoute(event, (authContext) =>
         updateProjectRedactionSettingsRoute(event, authContext)
+      );
+    }
+
+    if (method === "PUT" && path === "/projects/verify-settings") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        updateProjectVerifySettingsRoute(event, authContext)
       );
     }
 

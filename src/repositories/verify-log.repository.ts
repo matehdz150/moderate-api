@@ -47,3 +47,23 @@ export async function listVerifyLogsByProject(
 
   return (result.Items as VerifyLogRecord[] | undefined) ?? [];
 }
+
+export async function countVerifyLogsByProjectSince(
+  projectId: string,
+  since: string
+): Promise<number> {
+  const result = await dynamoDbClient.send(
+    new QueryCommand({
+      TableName: getVerifyLogsTableName(),
+      IndexName: "projectId-createdAt-index",
+      KeyConditionExpression: "projectId = :projectId AND createdAt >= :since",
+      ExpressionAttributeValues: {
+        ":projectId": projectId,
+        ":since": since,
+      },
+      Select: "COUNT",
+    })
+  );
+
+  return result.Count ?? 0;
+}

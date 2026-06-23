@@ -4,6 +4,7 @@ import { createProjectRecord } from "../repositories/project.repository.js";
 import { savePolicy } from "../repositories/policy.repository.js";
 import type { ProjectRecord, ProjectType, RedactionSettings } from "../types/project.types.js";
 import { normalizeRedactionSettings } from "../utils/redaction-settings.js";
+import { normalizeVerifySettings } from "../utils/verify-settings.js";
 import { getDefaultModerationPolicy } from "./policy-engine.service.js";
 
 export async function createProject(params: {
@@ -24,6 +25,9 @@ export async function createProject(params: {
     projectType,
     ...(projectType === "redaction"
       ? { redactionSettings: normalizeRedactionSettings(params.redactionSettings) }
+      : {}),
+    ...(projectType === "verify"
+      ? { verifySettings: normalizeVerifySettings() }
       : {}),
     planId: params.planId,
     monthlyLimit: params.monthlyLimit,

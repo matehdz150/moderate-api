@@ -9,7 +9,9 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 
 import type { ProjectRecord, RedactionSettings } from "../types/project.types.js";
+import type { VerifySettings } from "../types/verify.types.js";
 import { normalizeRedactionSettings } from "../utils/redaction-settings.js";
+import { normalizeVerifySettings } from "../utils/verify-settings.js";
 
 const dynamoDbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -21,6 +23,9 @@ function normalizeProjectRecord(project: ProjectRecord): ProjectRecord {
     projectType,
     ...(projectType === "redaction"
       ? { redactionSettings: normalizeRedactionSettings(project.redactionSettings) }
+      : {}),
+    ...(projectType === "verify"
+      ? { verifySettings: normalizeVerifySettings(project.verifySettings) }
       : {}),
   };
 }
@@ -129,6 +134,35 @@ export async function updateProjectRedactionSettings(params: {
       ExpressionAttributeValues: {
         ":projectType": "redaction",
         ":redactionSettings": params.redactionSettings,
+        ":updatedAt": params.updatedAt,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return normalizeProjectRecord(result.Attributes as ProjectRecord);
+}
+
+export async function updateProjectVerifySettings(params: {
+  accountId: string;
+  projectId: string;
+  verifySettings: VerifySettings;
+  updatedAt: string;
+}): Promise<ProjectRecord> {
+  const result = await dynamoDbClient.send(
+    new UpdateCommand({
+      TableName: getProjectsTableName(),
+      Key: {
+        accountId: params.accountId,
+        projectId: params.projectId,
+      },
+      ConditionExpression:
+        "attribute_exists(accountId) AND attribute_exists(projectId) AND projectType = :projectType",
+      UpdateExpression:
+        "SET verifySettings = :verifySettings, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":projectType": "verify",
+        ":verifySettings": params.verifySettings,
         ":updatedAt": params.updatedAt,
       },
       ReturnValues: "ALL_NEW",

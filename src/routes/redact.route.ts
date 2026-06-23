@@ -2,10 +2,10 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { ulid } from "ulid";
 
 import { getProjectById } from "../repositories/project.repository.js";
-import { saveRedactionLog } from "../repositories/redaction-log.repository.js";
+import { countRedactionLogsByProjectSince, saveRedactionLog } from "../repositories/redaction-log.repository.js";
 import { detectFaces, detectText } from "../services/rekognition.service.js";
 import { publishWebhookEvent } from "../services/webhook-event.service.js";
-import { getPlanRetentionDays } from "../services/plan.service.js";
+import { FREE_MONTHLY_REDACTIONS, getMonthStartIso, getPlanRetentionDays } from "../services/plan.service.js";
 import { redactImage } from "../services/redaction.service.js";
 import { createImageReadUrl, downloadImageObject, uploadImageObject } from "../services/s3.service.js";
 import type { AuthContext } from "../types/auth.types.js";
@@ -73,9 +73,19 @@ function parseRedactImageRequest(body: string | null): RedactImageRequest {
   return { imageKey: imageKey.trim() };
 }
 
-function assertPaidPlan(authContext: AuthContext) {
-  if (authContext.planId === "free") {
-    throw new HttpError(403, "Redaction is available on paid plans only");
+async function assertRedactionQuota(authContext: AuthContext) {
+  if (authContext.planId !== "free") return;
+
+  const used = await countRedactionLogsByProjectSince(
+    authContext.projectId,
+    getMonthStartIso()
+  );
+
+  if (used >= FREE_MONTHLY_REDACTIONS) {
+    throw new HttpError(
+      403,
+      `Free plan is limited to ${FREE_MONTHLY_REDACTIONS} redactions per month. Upgrade to a paid plan for unlimited redactions.`
+    );
   }
 }
 
@@ -155,7 +165,7 @@ export async function redactRoute(event: APIGatewayProxyEvent, authContext: Auth
     throw new Error("REDACTED_IMAGES_BUCKET_NAME is not configured");
   }
 
-  assertPaidPlan(authContext);
+  await assertRedactionQuota(authContext);
 
   const source = await getRedactionImageSource(event, authContext);
 

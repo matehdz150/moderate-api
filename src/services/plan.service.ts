@@ -1,6 +1,18 @@
 import type { PlanConfig, PlanId } from "../types/account.types.js";
 import { HttpError } from "../utils/http-response.js";
 
+/**
+ * Free plan can try redaction and verify, but with a small monthly cap per
+ * project. Paid plans are unlimited (subject to their overall monthlyLimit).
+ */
+export const FREE_MONTHLY_REDACTIONS = 50;
+export const FREE_MONTHLY_VERIFICATIONS = 25;
+
+/** ISO timestamp for the first day of the current month (UTC). */
+export function getMonthStartIso(): string {
+  return `${new Date().toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+}
+
 export const PLAN_CONFIGS: Record<PlanId, PlanConfig> = {
   free: {
     planId: "free",

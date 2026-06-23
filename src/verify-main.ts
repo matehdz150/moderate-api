@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 
+import { dashboardVerifyRoute } from "./routes/dashboard-verify.route.js";
 import { healthRoute } from "./routes/health.route.js";
 import { verifyRoute } from "./routes/verify.route.js";
 import { dashboardVerifyLogsRoute, verifyLogsRoute } from "./routes/verify-logs.route.js";
@@ -18,6 +19,12 @@ export async function handler(event: APIGatewayProxyEvent) {
     if (method === "POST" && path === "/verify") {
       return apiKeyProtectedRoute(event, (authContext) =>
         verifyRoute(event, authContext)
+      );
+    }
+
+    if (method === "POST" && path === "/dashboard/verify") {
+      return cognitoProtectedRoute(event, (authContext) =>
+        dashboardVerifyRoute(event, authContext)
       );
     }
 

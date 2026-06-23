@@ -7,12 +7,9 @@ import type {
   VerifySelfieResult,
   VerifySettings,
 } from "../types/verify.types.js";
+import { DEFAULT_VERIFY_SETTINGS } from "../utils/verify-settings.js";
 
-export const DEFAULT_VERIFY_SETTINGS: VerifySettings = {
-  faceMatchThreshold: 90,
-  faceMatchRejectBelow: 60,
-  requireUnexpiredDocument: true,
-};
+export { DEFAULT_VERIFY_SETTINGS };
 
 const EXPIRATION_KEYS = ["EXPIRATION_DATE", "DATE_OF_EXPIRY"];
 const TYPE_KEYS = ["ID_TYPE", "DOCUMENT_TYPE", "CLASS"];

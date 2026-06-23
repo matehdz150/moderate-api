@@ -3,7 +3,8 @@ export type WebhookEventType =
   | "moderation.review_required"
   | "review.approved"
   | "review.rejected"
-  | "redaction.completed";
+  | "redaction.completed"
+  | "verification.completed";
 
 export type WebhookEndpointStatus = "active" | "disabled";
 export type WebhookEventStatus = "pending" | "delivered" | "failed" | "skipped";

@@ -16,6 +16,7 @@ jobs:
       MODERATION_LAMBDA_FUNCTION_NAME: moderate-api-lambda
       WEBHOOK_LAMBDA_FUNCTION_NAME: moderate-api-webhook-lambda
       REDACTION_LAMBDA_FUNCTION_NAME: moderate-api-redaction-lambda
+      VERIFY_LAMBDA_FUNCTION_NAME: moderate-api-verify-lambda
 
     permissions:
       contents: read
@@ -184,3 +185,25 @@ jobs:
         run: |
           aws lambda wait function-updated \
             --function-name "$REDACTION_LAMBDA_FUNCTION_NAME"
+
+      - name: Deploy Verify Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$VERIFY_LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Verify Lambda Code
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$VERIFY_LAMBDA_FUNCTION_NAME"
+
+      - name: Configure Verify Lambda Handler
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$VERIFY_LAMBDA_FUNCTION_NAME" \
+            --handler dist/verify-main.handler
+
+      - name: Wait for Verify Lambda Configuration
+        run: |
+          aws lambda wait function-updated \
+            --function-name "$VERIFY_LAMBDA_FUNCTION_NAME"

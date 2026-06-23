@@ -111,7 +111,15 @@ Redaction behavior is configured per project from the Visora dashboard. The SDK 
 
 ```ts
 type RedactionStyle = "blur" | "black_box";
-type RedactionTextCategory = "sexual" | "profanity" | "credentials" | "id_document";
+type RedactionTextCategory =
+  | "id_document"
+  | "pii"
+  | "dates"
+  | "financial"
+  | "credentials"
+  | "medical"
+  | "sexual"
+  | "profanity";
 
 interface RedactionSettings {
   faceBlur: boolean;
@@ -126,6 +134,22 @@ interface RedactionSettings {
 ```
 
 Defaults are face blur on, text blur off, license plate blur off, `blur` style, no text categories, no custom/ignored words, and `minConfidence` of `80`.
+
+### Detection categories
+
+`textCategories` requires `textBlur` to be on. With `textBlur` on and **no** categories, all detected text is blurred. With categories, only the selected data types are redacted:
+
+| Category | Detects |
+| --- | --- |
+| `id_document` | Identity-document fields (passport, license, national ID) — blurs sensitive **values** near their labels, not the whole document. |
+| `pii` | Emails, phone numbers, addresses, IDs, and tax numbers (RFC, CURP, SSN). |
+| `dates` | Dates in any format — DOB, issue, expiry (`01/02/2024`, `2024-01-02`, `Jan 5 2024`). |
+| `financial` | Card numbers (Luhn-checked), bank accounts, IBAN, and CLABE. |
+| `credentials` | Passwords, API keys (`sk_`, `ghp_`, AWS), tokens, JWTs, and secrets. |
+| `medical` | Patient IDs, record numbers, and case numbers near their labels. |
+| `sexual` / `profanity` | Explicit or offensive wording. |
+
+`customWords` redacts exact words/phrases; `ignoredWords` prevents specific words (e.g. field labels) from being redacted.
 
 ## Webhook signatures
 
@@ -176,6 +200,10 @@ export const POST = createNextWebhookHandler({
       case "review.approved":
       case "review.rejected":
         await syncReviewDecision(event.data.reviewId, event.type);
+        break;
+      case "redaction.completed":
+        // event.data is narrowed to VisoraRedactionCompletedData
+        await storeRedactedImage(event.data.redactionId, event.data.redactedImageKey);
         break;
     }
   },

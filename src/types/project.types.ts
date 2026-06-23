@@ -1,4 +1,4 @@
-export type ProjectType = "moderation" | "redaction";
+export type ProjectType = "moderation" | "redaction" | "verify";
 export type RedactionStyle = "blur" | "black_box";
 export type RedactionTextCategory =
   | "sexual"
